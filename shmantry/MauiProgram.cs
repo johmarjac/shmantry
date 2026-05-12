@@ -19,6 +19,7 @@ public static class MauiProgram
 
         // Add device-specific services used by the shmantry.Shared project
         builder.Services.AddSingleton<IFormFactor, FormFactor>();
+        builder.Services.AddSingleton<IShmantryService, ShmantryService>();
 
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddMudServices();
