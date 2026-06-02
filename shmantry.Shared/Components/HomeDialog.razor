@@ -1,0 +1,60 @@
+@inject IShmantryService ShmantryService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-2" />
+            @(Home != null ? "Zuhause bearbeiten" : "Zuhause hinzufügen")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Name" Variant="Variant.Outlined"
+                      FullWidth="true" Required="true" Class="mb-3" />
+        <MudTextField @bind-Value="_description" Label="Beschreibung (optional)"
+                      Variant="Variant.Outlined" FullWidth="true" Lines="2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Abbrechen</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Save" Disabled="@(string.IsNullOrWhiteSpace(_name))">
+            Speichern
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Home? Home { get; set; }
+
+    private string _name = string.Empty;
+    private string _description = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (Home != null)
+        {
+            _name = Home.Name;
+            _description = Home.Description ?? string.Empty;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (Home == null)
+        {
+            await ShmantryService.CreateHomeAsync(_name.Trim(), string.IsNullOrWhiteSpace(_description) ? null : _description.Trim());
+            Snackbar.Add($"'{_name}' angelegt.", Severity.Success);
+        }
+        else
+        {
+            Home.Name = _name.Trim();
+            Home.Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim();
+            await ShmantryService.UpdateHomeAsync(Home);
+            Snackbar.Add($"'{_name}' aktualisiert.", Severity.Success);
+        }
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

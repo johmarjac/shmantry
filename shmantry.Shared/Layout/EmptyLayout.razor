@@ -1,24 +1,7 @@
-﻿@inherits LayoutComponentBase
-@using MudBlazor.Utilities
-@inject NavigationManager Navigation
-
-<MudThemeProvider IsDarkMode="true" Theme="@_theme" />
+@inherits LayoutComponentBase
 
 <MudLayout>
     <MudMainContent Class="pt-0">
         @Body
     </MudMainContent>
 </MudLayout>
-
-@code {
-    private MudTheme? _theme;
-
-    protected override void OnInitialized()
-    {
-        _theme = new MudTheme();
-        _theme.PaletteDark.Background = MudColor.Parse("111111");
-        _theme.PaletteDark.Primary = MudColor.Parse("fd8122");
-        _theme.PaletteDark.Secondary = MudColor.Parse("444444");
-    }
-
-}

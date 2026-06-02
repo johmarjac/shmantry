@@ -1,0 +1,198 @@
+@page "/storage/{LocationId}"
+@inject IShmantryService ShmantryService
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_location?.Name ?? "Ladevorgang…") – Shmantry</PageTitle>
+
+<MudContainer Class="pa-4 pb-20">
+    <div class="d-flex align-center gap-2 mb-1">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                       OnClick="@(() => Navigation.NavigateTo($"/homes/{_location?.HomeId}"))" />
+        <div style="flex:1;">
+            <MudText Typo="Typo.h5">@(_location?.Name ?? "…")</MudText>
+            @if (!string.IsNullOrEmpty(_location?.Description))
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@_location.Description</MudText>
+            }
+        </div>
+    </div>
+
+    @if (_expiredCount > 0)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">
+            @_expiredCount Artikel abgelaufen!
+        </MudAlert>
+    }
+    @if (_soonCount > 0)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+            @_soonCount Artikel laufen in 7 Tagen ab.
+        </MudAlert>
+    }
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center mt-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_entries.Count == 0)
+    {
+        <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0"
+                  Style="border: 2px dashed var(--mud-palette-lines-default); border-radius: 12px;">
+            <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+            <MudText Typo="Typo.h6">Noch keine Artikel</MudText>
+            <MudText Color="Color.Secondary" Class="mt-1">Tippe auf + um Artikel hinzuzufügen.</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudList T="ItemEntryWithDetails" Dense="false">
+            @foreach (var entry in _entries)
+            {
+                <MudListItem>
+                    <div class="d-flex align-center gap-3 w-100">
+                        @if (!string.IsNullOrEmpty(entry.ImageUrl))
+                        {
+                            <MudImage Src="@entry.ImageUrl" Width="48" Height="48"
+                                      ObjectFit="ObjectFit.Cover" Class="rounded" />
+                        }
+                        else
+                        {
+                            <MudAvatar Color="Color.Secondary" Size="Size.Large">
+                                <MudIcon Icon="@Icons.Material.Filled.SetMeal" />
+                            </MudAvatar>
+                        }
+
+                        <div style="flex:1; min-width:0;">
+                            <MudText Typo="Typo.body1" Style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                @entry.Name
+                            </MudText>
+                            @if (!string.IsNullOrEmpty(entry.Brand))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@entry.Brand</MudText>
+                            }
+                            <div class="d-flex align-center gap-2 mt-1">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Label="true">
+                                    @entry.Quantity ×
+                                </MudChip>
+                                @if (entry.BestBeforeDate.HasValue)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Label="true"
+                                             Color="@(entry.IsExpired ? Color.Error : entry.IsExpiringSoon ? Color.Warning : Color.Default)">
+                                        MHD: @entry.BestBeforeDate.Value.ToString("dd.MM.yyyy")
+                                    </MudChip>
+                                }
+                                @if (!string.IsNullOrEmpty(entry.NutriScore))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Label="true" Color="Color.Info">
+                                        Nutri-Score @entry.NutriScore
+                                    </MudChip>
+                                }
+                            </div>
+                        </div>
+
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                            <MudMenuItem OnClick="() => EditEntry(entry)"
+                                         Icon="@Icons.Material.Filled.Edit">Bearbeiten</MudMenuItem>
+                            <MudMenuItem OnClick="() => TransferEntry(entry)"
+                                         Icon="@Icons.Material.Filled.MoveUp">Umlagern</MudMenuItem>
+                            <MudMenuItem OnClick="() => DeleteEntry(entry)"
+                                         Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">Löschen</MudMenuItem>
+                        </MudMenu>
+                    </div>
+                </MudListItem>
+                <MudDivider />
+            }
+        </MudList>
+    }
+</MudContainer>
+
+<MudFab Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+        Style="position:fixed; bottom:72px; right:16px; z-index:100;"
+        OnClick="AddItem" />
+
+@code {
+    [Parameter] public string LocationId { get; set; } = string.Empty;
+
+    private StorageLocation? _location;
+    private List<ItemEntryWithDetails> _entries = [];
+    private bool _loading = true;
+    private int _expiredCount;
+    private int _soonCount;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var homes = await ShmantryService.GetHomesAsync();
+        // load location info
+        foreach (var h in homes)
+        {
+            var locs = await ShmantryService.GetStorageLocationsAsync(h.Id);
+            _location = locs.FirstOrDefault(l => l.Id == LocationId);
+            if (_location != null) break;
+        }
+
+        _entries = await ShmantryService.GetItemEntriesAsync(LocationId);
+        _expiredCount = _entries.Count(e => e.IsExpired);
+        _soonCount = _entries.Count(e => e.IsExpiringSoon && !e.IsExpired);
+        _loading = false;
+    }
+
+    private async Task AddItem()
+    {
+        var parameters = new DialogParameters { ["StorageLocationId"] = LocationId };
+        var dialog = await DialogService.ShowAsync<AddItemDialog>("Artikel hinzufügen", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadAsync();
+    }
+
+    private async Task EditEntry(ItemEntryWithDetails entry)
+    {
+        var itemEntry = new ItemEntry
+        {
+            Id = entry.Id,
+            FoodItemId = entry.FoodItemId,
+            StorageLocationId = entry.StorageLocationId,
+            Quantity = entry.Quantity,
+            BestBeforeDate = entry.BestBeforeDate,
+            Notes = entry.Notes
+        };
+        var parameters = new DialogParameters
+        {
+            ["StorageLocationId"] = LocationId,
+            ["ExistingEntry"] = itemEntry,
+            ["FoodItemName"] = entry.Name
+        };
+        var dialog = await DialogService.ShowAsync<AddItemDialog>("Artikel bearbeiten", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadAsync();
+    }
+
+    private async Task TransferEntry(ItemEntryWithDetails entry)
+    {
+        var parameters = new DialogParameters { ["Entry"] = entry };
+        var dialog = await DialogService.ShowAsync<TransferDialog>("Artikel umlagern", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadAsync();
+    }
+
+    private async Task DeleteEntry(ItemEntryWithDetails entry)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Artikel löschen",
+            $"'{entry.Name}' aus diesem Lagerort entfernen?",
+            yesText: "Löschen", cancelText: "Abbrechen");
+
+        if (confirmed == true)
+        {
+            await ShmantryService.DeleteItemEntryAsync(entry.Id);
+            Snackbar.Add("Artikel entfernt.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+}

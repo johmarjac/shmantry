@@ -1,0 +1,110 @@
+@page "/homes/{HomeId}"
+@inject IShmantryService ShmantryService
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_home?.Name ?? "Ladevorgang…") – Shmantry</PageTitle>
+
+<MudContainer Class="pa-4 pb-20">
+    <div class="d-flex align-center gap-2 mb-4">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/home"))" />
+        <MudText Typo="Typo.h5" Style="flex:1;">@(_home?.Name ?? "…")</MudText>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center mt-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_locations.Count == 0)
+    {
+        <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0"
+                  Style="border: 2px dashed var(--mud-palette-lines-default); border-radius: 12px;">
+            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+            <MudText Typo="Typo.h6">Keine Lagerorte vorhanden</MudText>
+            <MudText Color="Color.Secondary" Class="mt-1">Tippe auf + um den ersten Lagerort anzulegen.</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var loc in _locations)
+            {
+                <MudItem xs="12" sm="6">
+                    <MudCard Style="cursor:pointer;" @onclick="() => Navigation.NavigateTo($"/storage/{loc.Id}")">
+                        <MudCardContent Class="d-flex align-center gap-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Primary" Size="Size.Large" />
+                            <div style="flex:1; min-width:0;">
+                                <MudText Typo="Typo.h6" Style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@loc.Name</MudText>
+                                @if (!string.IsNullOrEmpty(loc.Description))
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@loc.Description</MudText>
+                                }
+                            </div>
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                           OnClick="@(async e => { e.StopPropagation(); await EditLocation(loc); })" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="@(async e => { e.StopPropagation(); await DeleteLocation(loc); })" />
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+<MudFab Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+        Style="position:fixed; bottom:72px; right:16px; z-index:100;"
+        OnClick="AddLocation" />
+
+@code {
+    [Parameter] public string HomeId { get; set; } = string.Empty;
+
+    private Home? _home;
+    private List<StorageLocation> _locations = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var homes = await ShmantryService.GetHomesAsync();
+        _home = homes.FirstOrDefault(h => h.Id == HomeId);
+        _locations = await ShmantryService.GetStorageLocationsAsync(HomeId);
+        _loading = false;
+    }
+
+    private async Task AddLocation()
+    {
+        var parameters = new DialogParameters { ["HomeId"] = HomeId };
+        var dialog = await DialogService.ShowAsync<StorageLocationDialog>("Lagerort hinzufügen", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadAsync();
+    }
+
+    private async Task EditLocation(StorageLocation loc)
+    {
+        var parameters = new DialogParameters { ["HomeId"] = HomeId, ["Location"] = loc };
+        var dialog = await DialogService.ShowAsync<StorageLocationDialog>("Lagerort bearbeiten", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadAsync();
+    }
+
+    private async Task DeleteLocation(StorageLocation loc)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Lagerort löschen",
+            $"'{loc.Name}' und alle darin enthaltenen Artikel wirklich löschen?",
+            yesText: "Löschen", cancelText: "Abbrechen");
+
+        if (confirmed == true)
+        {
+            await ShmantryService.DeleteStorageLocationAsync(loc.Id);
+            Snackbar.Add($"'{loc.Name}' gelöscht.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+}

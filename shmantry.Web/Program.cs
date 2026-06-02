@@ -5,33 +5,34 @@ using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Add device-specific services used by the shmantry.Shared project
 builder.Services.AddSingleton<IFormFactor, FormFactor>();
+builder.Services.AddSingleton<IShmantryService, shmantry.Web.Services.ShmantryService>();
+builder.Services.AddSingleton<IBarcodeScannerService, shmantry.Web.Services.BarcodeScannerService>();
+
+builder.Services.AddHttpClient<IOpenFoodFactsService, OpenFoodFactsService>(client =>
+{
+    client.DefaultRequestHeaders.UserAgent.TryParseAdd("Shmantry/1.0 (food-inventory)");
+});
+
 builder.Services.AddMudServices();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
-
 app.UseAntiforgery();
-
 app.MapStaticAssets();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
-    .AddAdditionalAssemblies(
-        typeof(shmantry.Shared._Imports).Assembly);
+    .AddAdditionalAssemblies(typeof(shmantry.Shared._Imports).Assembly);
 
 app.Run();

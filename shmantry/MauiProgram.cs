@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using shmantry.Shared.Services;
 using shmantry.Services;
 using MudBlazor.Services;
@@ -17,9 +17,14 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             });
 
-        // Add device-specific services used by the shmantry.Shared project
         builder.Services.AddSingleton<IFormFactor, FormFactor>();
         builder.Services.AddSingleton<IShmantryService, ShmantryService>();
+        builder.Services.AddSingleton<IBarcodeScannerService, BarcodeScannerService>();
+
+        builder.Services.AddHttpClient<IOpenFoodFactsService, OpenFoodFactsService>(client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.TryParseAdd("Shmantry/1.0 (food-inventory)");
+        });
 
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddMudServices();

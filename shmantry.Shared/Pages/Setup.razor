@@ -1,15 +1,65 @@
-﻿@page "/setup"
+@page "/setup"
 @layout EmptyLayout
+@inject IShmantryService ShmantryService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 
-<MudContainer Class="d-flex flex-column align-center justify-center text-center gap-1" Style="height: 100vh;">
-    <MudImage Src="/assets/logo.png" Fluid="true" />
-    <MudText>Shmantry</MudText>
-    <MudText>Deine Vorräte auf einen Blick!</MudText>
-    
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true">Datenbank Erstellen</MudButton>
-    <MudButton Variant="Variant.Filled" Color="Color.Secondary" FullWidth="true">Datenbank Öffnen</MudButton>
+<MudContainer Class="d-flex flex-column align-center justify-center text-center gap-3 pa-6" Style="height: 100vh; max-width: 420px;">
+    <MudImage Src="/assets/logo.png" Fluid="true" Style="max-width:120px;" />
+    <div>
+        <MudText Typo="Typo.h4" Class="mb-1">Shmantry</MudText>
+        <MudText Typo="Typo.subtitle1" Color="Color.Secondary">Deine Vorräte auf einen Blick</MudText>
+    </div>
+
+    <MudPaper Class="pa-4 w-100" Elevation="2">
+        <MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
+            Wähle eine vorhandene Datenbank oder erstelle eine neue. Die Datenbankdatei kann in einem
+            Sync-Ordner (Dropbox, OneDrive…) gespeichert werden, um sie auf mehreren Geräten zu nutzen.
+        </MudText>
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                   Class="mb-2" StartIcon="@Icons.Material.Filled.CreateNewFolder"
+                   OnClick="CreateDatabase" Disabled="@_busy">
+            Neue Datenbank erstellen
+        </MudButton>
+
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                   StartIcon="@Icons.Material.Filled.FolderOpen"
+                   OnClick="OpenDatabase" Disabled="@_busy">
+            Datenbank öffnen
+        </MudButton>
+    </MudPaper>
+
+    @if (_busy)
+    {
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    }
 </MudContainer>
 
 @code {
+    private bool _busy;
 
+    private async Task CreateDatabase()
+    {
+        _busy = true;
+        var ok = await ShmantryService.CreateDatabaseAsync();
+        _busy = false;
+
+        if (ok)
+            Navigation.NavigateTo("/home");
+        else
+            Snackbar.Add("Datenbank konnte nicht erstellt werden.", Severity.Error);
+    }
+
+    private async Task OpenDatabase()
+    {
+        _busy = true;
+        var ok = await ShmantryService.OpenDatabaseAsync();
+        _busy = false;
+
+        if (ok)
+            Navigation.NavigateTo("/home");
+        else
+            Snackbar.Add("Datenbank konnte nicht geöffnet werden.", Severity.Error);
+    }
 }

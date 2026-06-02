@@ -1,24 +1,32 @@
-﻿@using shmantry.Shared.Services
+@using shmantry.Shared.Services
 @inject NavigationManager Navigation
 @inject IShmantryService ShmantryService
 
+<MudThemeProvider IsDarkMode="true" Theme="@_theme" />
+<MudSnackbarProvider />
+<MudDialogProvider FullWidth="true" MaxWidth="MaxWidth.Small" />
+<MudPopoverProvider />
+
 <Router AppAssembly="typeof(Layout.MainLayout).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.EmptyLayout)" />
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
 
 @code {
+    private MudTheme? _theme;
+
     protected override void OnInitialized()
     {
-        if(ShmantryService.IsAppInitialized())
-        {
+        _theme = new MudTheme();
+        _theme.PaletteDark.Background = MudColor.Parse("111111");
+        _theme.PaletteDark.Primary = MudColor.Parse("fd8122");
+        _theme.PaletteDark.Secondary = MudColor.Parse("444444");
+
+        if (ShmantryService.IsAppInitialized())
             Navigation.NavigateTo("/home");
-        }
         else
-        {
             Navigation.NavigateTo("/setup");
-        }
     }
 }

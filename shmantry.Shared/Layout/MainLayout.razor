@@ -1,14 +1,29 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
 
 <MudLayout>
-    <MudMainContent>
+    <MudMainContent Class="pb-16">
         @Body
     </MudMainContent>
-    <MudAppBar Bottom="true" Fixed="true" Color="Color.Primary">
-
+    <MudAppBar Bottom="true" Fixed="true" Color="Color.Dark" Elevation="8" Dense="true">
+        <MudGrid Justify="Justify.Center" Spacing="0" Class="w-100">
+            <MudItem xs="4" Class="d-flex justify-center">
+                <MudIconButton Icon="@Icons.Material.Filled.Home"
+                               Color="@NavColor("/home")"
+                               OnClick="@(() => Navigation.NavigateTo("/home"))"
+                               Size="Size.Large" />
+            </MudItem>
+            <MudItem xs="4" Class="d-flex justify-center">
+                <MudIconButton Icon="@Icons.Material.Filled.QrCodeScanner"
+                               Color="@NavColor("/scan")"
+                               OnClick="@(() => Navigation.NavigateTo("/scan"))"
+                               Size="Size.Large" />
+            </MudItem>
+        </MudGrid>
     </MudAppBar>
 </MudLayout>
 
 @code {
-    
+    private Color NavColor(string path) =>
+        Navigation.Uri.Contains(path) ? Color.Primary : Color.Default;
 }
