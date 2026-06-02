@@ -291,8 +291,12 @@ window.shmantry = {
             if (this._app) return this._app;
             await this._loadMsal();
 
+            // auth.html is a minimal page that doesn't load Blazor.
+            // Without it, Blazor's router calls history.replaceState on load and strips
+            // the #code= hash before MSAL can read it, causing hash_empty_error.
             const base = document.querySelector('base');
-            const redirectUri = base ? base.href : (window.location.origin + '/');
+            const baseHref = base ? base.href : (window.location.origin + '/');
+            const redirectUri = baseHref + 'auth.html';
 
             this._app = new msal.PublicClientApplication({
                 auth: {
