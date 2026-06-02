@@ -88,6 +88,67 @@ window.shmantry = {
     scanBarcode: function () {
         return new Promise(async function (resolve) {
             const useNative = ('BarcodeDetector' in window);
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+            // ── iOS (Safari / Edge / Chrome on WebKit) ───────────────────────────
+            // Live video frame capture is unreliable on iOS WebKit. Instead open
+            // the native camera via a file input and decode the resulting still image.
+            if (!useNative && isIOS) {
+                try { await shmantry._loadZXing(); }
+                catch {
+                    shmantry._toast('Kamera-Bibliothek konnte nicht geladen werden');
+                    resolve(null);
+                    return;
+                }
+
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.capture = 'environment';
+                input.style.display = 'none';
+                document.body.appendChild(input);
+
+                // Handle "cancel" – window regains focus without a file being chosen.
+                function onWindowFocus() {
+                    setTimeout(function () {
+                        if (!input.files || input.files.length === 0) {
+                            input.remove();
+                            resolve(null);
+                        }
+                    }, 400);
+                }
+                window.addEventListener('focus', onWindowFocus, { once: true });
+
+                input.onchange = async function () {
+                    window.removeEventListener('focus', onWindowFocus);
+                    const file = input.files[0];
+                    input.remove();
+                    if (!file) { resolve(null); return; }
+
+                    const url = URL.createObjectURL(file);
+                    try {
+                        const hints = new Map();
+                        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                            ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+                            ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+                            ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+                            ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX
+                        ]);
+                        const result = await new ZXing.BrowserMultiFormatReader(hints).decodeFromImageUrl(url);
+                        resolve(result.getText());
+                    } catch {
+                        shmantry._toast('Kein Barcode erkannt – bitte erneut versuchen.');
+                        resolve(null);
+                    } finally {
+                        URL.revokeObjectURL(url);
+                    }
+                };
+
+                input.click();
+                return;
+            }
+
+            // ── All other browsers ───────────────────────────────────────────────
 
             if (!useNative) {
                 try { await shmantry._loadZXing(); }
@@ -143,8 +204,7 @@ window.shmantry = {
                 scan();
 
             } else {
-                // ZXing fallback – iOS Safari, Firefox, all other browsers.
-                // Let ZXing manage the camera via decodeFromConstraints (handles getUserMedia internally).
+                // ZXing fallback – Firefox and other non-iOS browsers without BarcodeDetector.
                 const hints = new Map();
                 hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
                     ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
@@ -165,15 +225,12 @@ window.shmantry = {
                 cancelBtn.onclick = function () { cleanup(); resolve(null); };
 
                 try {
-                    // decodeFromConstraints starts the camera, attaches stream to video,
-                    // and fires the callback on every frame (result=null if no barcode yet).
                     controls = await zxReader.decodeFromConstraints(
                         { video: { facingMode: { ideal: 'environment' } } },
                         video,
                         function (result, error) {
                             if (!active) return;
                             if (result) { cleanup(); resolve(result.getText()); }
-                            // error here is just NotFoundException (no barcode in frame) — ignore
                         }
                     );
                 } catch {
