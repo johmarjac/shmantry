@@ -1,0 +1,86 @@
+@page "/settings"
+@inject IShmantryService ShmantryService
+@inject NavigationManager Navigation
+@inject IFormFactor FormFactor
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Einstellungen – Shmantry</PageTitle>
+
+<MudContainer Class="pa-4 pb-20">
+    <MudText Typo="Typo.h5" Class="mb-4">Einstellungen</MudText>
+
+    @if (FormFactor.GetFormFactor() == "Web")
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.subtitle1" Class="mb-1">Daten sichern</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Exportiere alle Daten als JSON-Datei. Speichere sie in OneDrive oder Dropbox,
+                um sie beim nächsten Seitenbesuch wieder zu importieren.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Download"
+                       OnClick="ExportData" Disabled="@_busy">
+                Daten exportieren
+            </MudButton>
+        </MudPaper>
+
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.subtitle1" Class="mb-1">Zurücksetzen</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Alle lokalen Daten löschen und zur Startseite zurückkehren.
+            </MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.DeleteForever"
+                       OnClick="ResetData" Disabled="@_busy">
+                Zurücksetzen
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.body1" Class="mb-2">Datenbankdatei</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Die SQLite-Datenbank wird im App-Verzeichnis gespeichert.
+                Für geräteübergreifende Synchronisierung kopiere die Datei in einen
+                Sync-Ordner (OneDrive, Dropbox) und öffne sie über „Datenbank öffnen".
+            </MudText>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private bool _busy;
+
+    private async Task ExportData()
+    {
+        _busy = true;
+        try
+        {
+            var json = await ShmantryService.ExportDataAsync();
+            var filename = $"shmantry-backup-{DateTime.Now:yyyy-MM-dd}.json";
+            await JS.InvokeVoidAsync("shmantry.downloadFile", filename, json);
+        }
+        catch
+        {
+            Snackbar.Add("Fehler beim Exportieren.", Severity.Error);
+        }
+        _busy = false;
+    }
+
+    private async Task ResetData()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Daten zurücksetzen",
+            "Alle Daten unwiderruflich löschen?",
+            yesText: "Zurücksetzen", cancelText: "Abbrechen");
+
+        if (confirmed == true)
+        {
+            ShmantryService.CloseDatabase();
+            Navigation.NavigateTo("setup");
+        }
+    }
+}

@@ -284,6 +284,19 @@ public class ShmantryService : IShmantryService
         return result;
     }
 
+    public async Task<string> ExportDataAsync()
+    {
+        await EnsureDbAsync();
+        var homes = await _db!.Table<Home>().ToListAsync();
+        var locations = await _db!.Table<StorageLocation>().ToListAsync();
+        var foodItems = await _db!.Table<FoodItem>().ToListAsync();
+        var entries = await _db!.Table<ItemEntry>().ToListAsync();
+        var data = new { Homes = homes, Locations = locations, FoodItems = foodItems, Entries = entries };
+        return System.Text.Json.JsonSerializer.Serialize(data, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+    }
+
+    public Task<bool> ImportDataAsync(string json) => Task.FromResult(false);
+
     public void Dispose()
     {
         _db?.CloseAsync();
