@@ -5,10 +5,10 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-<PageTitle>Zuhause – Shmantry</PageTitle>
+<PageTitle>Dashboard – Shmantry</PageTitle>
 
 <MudContainer Class="pa-4 pb-20">
-    <MudText Typo="Typo.h5" Class="mb-4">Meine Zuhause</MudText>
+    <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight:700;">Haushalte</MudText>
 
     @if (_loading)
     {
@@ -21,8 +21,8 @@
         <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0"
                   Style="border: 2px dashed var(--mud-palette-lines-default); border-radius: 12px;">
             <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
-            <MudText Typo="Typo.h6">Noch kein Zuhause angelegt</MudText>
-            <MudText Color="Color.Secondary" Class="mt-1">Tippe auf + um dein erstes Zuhause hinzuzufügen.</MudText>
+            <MudText Typo="Typo.h6">Noch kein Haushalt angelegt</MudText>
+            <MudText Color="Color.Secondary" Class="mt-1">Tippe auf + um deinen ersten Haushalt hinzuzufügen.</MudText>
         </MudPaper>
     }
     else
@@ -78,7 +78,7 @@
 
     private async Task AddHome()
     {
-        var dialog = await DialogService.ShowAsync<HomeDialog>("Zuhause hinzufügen");
+        var dialog = await DialogService.ShowAsync<HomeDialog>("Haushalt hinzufügen");
         var result = await dialog.Result;
         if (!result.Canceled) await LoadAsync();
     }
@@ -86,7 +86,7 @@
     private async Task EditHome(Models.Home home)
     {
         var parameters = new DialogParameters<HomeDialog> { { x => x.Home, home } };
-        var dialog = await DialogService.ShowAsync<HomeDialog>("Zuhause bearbeiten", parameters);
+        var dialog = await DialogService.ShowAsync<HomeDialog>("Haushalt bearbeiten", parameters);
         var result = await dialog.Result;
         if (!result.Canceled) await LoadAsync();
     }
@@ -94,8 +94,8 @@
     private async Task DeleteHome(Models.Home home)
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
-            "Zuhause löschen",
-            $"'{home.Name}' und alle darin enthaltenen Lagerorte und Artikel wirklich löschen?",
+            "Haushalt löschen",
+            $"'{home.Name}' und alle darin enthaltenen Lagerorte und Vorräte wirklich löschen?",
             yesText: "Löschen", cancelText: "Abbrechen");
 
         if (confirmed == true)
