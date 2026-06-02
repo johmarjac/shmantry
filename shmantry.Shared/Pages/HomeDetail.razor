@@ -8,7 +8,7 @@
 
 <MudContainer Class="pa-4 pb-20">
     <div class="d-flex align-center gap-2 mb-4">
-        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/home"))" />
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("home"))" />
         <MudText Typo="Typo.h5" Style="flex:1;">@(_home?.Name ?? "…")</MudText>
     </div>
 
@@ -81,7 +81,7 @@
         _loading = false;
     }
 
-    private void GoToStorage(string id) => Navigation.NavigateTo($"/storage/{id}");
+    private void GoToStorage(string id) => Navigation.NavigateTo($"storage/{id}");
 
     private async Task AddLocation()
     {

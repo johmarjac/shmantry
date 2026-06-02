@@ -46,7 +46,7 @@
         _busy = false;
 
         if (ok)
-            Navigation.NavigateTo("/home");
+            Navigation.NavigateTo("home");
         else
             Snackbar.Add("Datenbank konnte nicht erstellt werden.", Severity.Error);
     }
@@ -58,7 +58,7 @@
         _busy = false;
 
         if (ok)
-            Navigation.NavigateTo("/home");
+            Navigation.NavigateTo("home");
         else
             Snackbar.Add("Datenbank konnte nicht geöffnet werden.", Severity.Error);
     }

@@ -25,8 +25,8 @@
         _theme.PaletteDark.Secondary = MudColor.Parse("444444");
 
         if (ShmantryService.IsAppInitialized())
-            Navigation.NavigateTo("/home");
+            Navigation.NavigateTo("home");
         else
-            Navigation.NavigateTo("/setup");
+            Navigation.NavigateTo("setup");
     }
 }
