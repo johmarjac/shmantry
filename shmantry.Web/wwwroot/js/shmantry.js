@@ -37,8 +37,7 @@ window.shmantry = {
         return new Promise(function (resolve, reject) {
             if (window.ZXing) { resolve(); return; }
             const s = document.createElement('script');
-            // @zxing/library UMD bundle from unpkg (official npm CDN)
-            s.src = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
+            s.src = 'js/zxing.min.js';
             s.onload = resolve;
             s.onerror = function () { reject(new Error('ZXing konnte nicht geladen werden')); };
             document.head.appendChild(s);
@@ -197,8 +196,7 @@ window.shmantry = {
             return new Promise(function (resolve, reject) {
                 if (window.msal) { resolve(); return; }
                 const s = document.createElement('script');
-                // MSAL.js v3 – official Microsoft Azure CDN
-                s.src = 'https://alcdn.msauth.net/browser/3.27.0/js/msal-browser.min.js';
+                s.src = 'js/msal-browser.min.js';
                 s.onload = resolve;
                 s.onerror = function () { reject(new Error('MSAL konnte nicht geladen werden')); };
                 document.head.appendChild(s);
