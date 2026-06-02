@@ -1,0 +1,235 @@
+@inject IShmantryService ShmantryService
+@inject IOpenFoodFactsService OpenFoodFacts
+@inject IBarcodeScannerService BarcodeScanner
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart" Class="mr-2" />
+            @(ExistingEntry != null ? "Artikel bearbeiten" : "Artikel hinzufügen")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (ExistingEntry == null && FoodItem == null)
+        {
+            <div class="d-flex gap-2 mb-3 align-end">
+                <MudTextField @bind-Value="_barcode" Label="Barcode" Variant="Variant.Outlined"
+                              FullWidth="true" Immediate="true"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@Icons.Material.Filled.QrCodeScanner"
+                              OnAdornmentClick="ScanBarcode" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           OnClick="LookupBarcode" Disabled="@(string.IsNullOrWhiteSpace(_barcode) || _looking)">
+                    @if (_looking) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { <text>Suchen</text> }
+                </MudButton>
+            </div>
+        }
+
+        @if (_showForm)
+        {
+            var fi = FoodItem ?? _resolvedFoodItem;
+            @if (fi != null)
+            {
+                <MudPaper Class="pa-3 mb-3 d-flex gap-3 align-center" Elevation="0" Style="background:var(--mud-palette-background-grey);">
+                    @if (!string.IsNullOrEmpty(fi.ImageUrl))
+                    {
+                        <MudImage Src="@fi.ImageUrl" Width="48" Height="48" ObjectFit="ObjectFit.Cover" Class="rounded" />
+                    }
+                    <div>
+                        <MudText Typo="Typo.body1"><strong>@fi.Name</strong></MudText>
+                        @if (!string.IsNullOrEmpty(fi.Brand)) { <MudText Typo="Typo.caption" Color="Color.Secondary">@fi.Brand</MudText> }
+                    </div>
+                </MudPaper>
+            }
+            else if (!string.IsNullOrEmpty(FoodItemName))
+            {
+                <MudPaper Class="pa-3 mb-3" Elevation="0" Style="background:var(--mud-palette-background-grey);">
+                    <MudText Typo="Typo.body1"><strong>@FoodItemName</strong></MudText>
+                </MudPaper>
+            }
+
+            @if (StorageLocationId == null && _locationGroups.Count > 0)
+            {
+                <MudSelect @bind-Value="_selectedLocationId" Label="Lagerort" Variant="Variant.Outlined"
+                           FullWidth="true" Class="mb-3" Required="true">
+                    @foreach (var group in _locationGroups)
+                    {
+                        <MudSelectItem Disabled="true" Value="@("__" + group.HomeName)">
+                            <MudText Typo="Typo.overline">@group.HomeName</MudText>
+                        </MudSelectItem>
+                        @foreach (var loc in group.Locations)
+                        {
+                            <MudSelectItem Value="@loc.Id">@loc.Name</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            }
+
+            <MudNumericField @bind-Value="_quantity" Label="Anzahl" Variant="Variant.Outlined"
+                             Min="1" FullWidth="true" Class="mb-3" />
+
+            <MudDatePicker @bind-Date="_bestBefore" Label="Mindesthaltbarkeitsdatum (optional)"
+                           Variant="Variant.Outlined" Class="mb-3 w-100"
+                           Clearable="true" DateFormat="dd.MM.yyyy" />
+
+            <MudTextField @bind-Value="_notes" Label="Notizen (optional)" Variant="Variant.Outlined"
+                          FullWidth="true" Lines="2" />
+        }
+        else if (_notFound)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Kein Produkt gefunden. Gib einen Namen ein um fortzufahren.
+            </MudAlert>
+            <MudTextField @bind-Value="_manualName" Label="Produktname" Variant="Variant.Outlined"
+                          FullWidth="true" Class="mt-3" />
+            <MudButton Color="Color.Primary" Class="mt-2" OnClick="UseManualName"
+                       Disabled="@string.IsNullOrWhiteSpace(_manualName)">
+                Weiter
+            </MudButton>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Abbrechen</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Save" Disabled="@(!CanSave)">
+            Speichern
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string? StorageLocationId { get; set; }
+    [Parameter] public ItemEntry? ExistingEntry { get; set; }
+    [Parameter] public string? FoodItemName { get; set; }
+    [Parameter] public FoodItem? FoodItem { get; set; }
+
+    private string _barcode = string.Empty;
+    private bool _looking;
+    private bool _notFound;
+    private bool _showForm;
+    private FoodItem? _resolvedFoodItem;
+    private string _selectedLocationId = string.Empty;
+    private int _quantity = 1;
+    private DateTime? _bestBefore;
+    private string _notes = string.Empty;
+    private string _manualName = string.Empty;
+
+    private record LocationGroup(string HomeName, List<StorageLocation> Locations);
+    private List<LocationGroup> _locationGroups = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ExistingEntry != null)
+        {
+            _quantity = ExistingEntry.Quantity;
+            _bestBefore = ExistingEntry.BestBeforeDate;
+            _notes = ExistingEntry.Notes ?? string.Empty;
+            _showForm = true;
+        }
+
+        if (FoodItem != null) _showForm = true;
+
+        if (StorageLocationId == null)
+        {
+            var homes = await ShmantryService.GetHomesAsync();
+            foreach (var home in homes)
+            {
+                var locs = await ShmantryService.GetStorageLocationsAsync(home.Id);
+                if (locs.Count > 0)
+                    _locationGroups.Add(new LocationGroup(home.Name, locs));
+            }
+            if (_locationGroups.Count > 0 && _locationGroups[0].Locations.Count > 0)
+                _selectedLocationId = _locationGroups[0].Locations[0].Id;
+        }
+    }
+
+    private bool CanSave =>
+        _showForm
+        && _quantity >= 1
+        && (StorageLocationId != null || !string.IsNullOrWhiteSpace(_selectedLocationId));
+
+    private async Task ScanBarcode()
+    {
+        if (!BarcodeScanner.IsSupported) return;
+        var code = await BarcodeScanner.ScanBarcodeAsync();
+        if (!string.IsNullOrEmpty(code))
+        {
+            _barcode = code;
+            await LookupBarcode();
+        }
+    }
+
+    private async Task LookupBarcode()
+    {
+        if (string.IsNullOrWhiteSpace(_barcode)) return;
+        _looking = true;
+        _notFound = false;
+        _showForm = false;
+        _resolvedFoodItem = null;
+
+        var local = await ShmantryService.GetFoodItemByBarcodeAsync(_barcode.Trim());
+        if (local != null)
+        {
+            _resolvedFoodItem = local;
+            _showForm = true;
+        }
+        else
+        {
+            var off = await OpenFoodFacts.LookupBarcodeAsync(_barcode.Trim());
+            if (off != null)
+            {
+                _resolvedFoodItem = await ShmantryService.SaveFoodItemAsync(off);
+                _showForm = true;
+            }
+            else
+            {
+                _notFound = true;
+            }
+        }
+        _looking = false;
+    }
+
+    private void UseManualName()
+    {
+        _resolvedFoodItem = null;
+        _notFound = false;
+        _showForm = true;
+    }
+
+    private async Task Save()
+    {
+        var locationId = StorageLocationId ?? _selectedLocationId;
+
+        if (ExistingEntry != null)
+        {
+            ExistingEntry.Quantity = _quantity;
+            ExistingEntry.BestBeforeDate = _bestBefore;
+            ExistingEntry.Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim();
+            await ShmantryService.UpdateItemEntryAsync(ExistingEntry);
+        }
+        else
+        {
+            FoodItem fi;
+            if (FoodItem != null)
+                fi = FoodItem;
+            else if (_resolvedFoodItem != null)
+                fi = _resolvedFoodItem;
+            else
+            {
+                var name = !string.IsNullOrWhiteSpace(_manualName) ? _manualName.Trim() : _barcode.Trim();
+                fi = new FoodItem { Barcode = string.IsNullOrWhiteSpace(_barcode) ? null : _barcode.Trim(), Name = name };
+                fi = await ShmantryService.SaveFoodItemAsync(fi);
+            }
+
+            await ShmantryService.AddItemEntryAsync(
+                locationId, fi.Id, _quantity, _bestBefore,
+                string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim());
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

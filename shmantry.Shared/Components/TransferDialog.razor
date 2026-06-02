@@ -1,0 +1,88 @@
+@inject IShmantryService ShmantryService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.MoveUp" Class="mr-2" />
+            Artikel umlagern
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Class="mb-3">
+            <strong>@Entry.Name</strong> aus <em>@Entry.StorageLocationName</em> umlagern:
+        </MudText>
+
+        <MudNumericField @bind-Value="_quantity" Label="Anzahl" Variant="Variant.Outlined"
+                         Min="1" Max="@Entry.Quantity" FullWidth="true" Class="mb-3" />
+
+        @if (_locationGroups.Count > 0)
+        {
+            <MudSelect @bind-Value="_targetLocationId" Label="Ziel-Lagerort" Variant="Variant.Outlined"
+                       FullWidth="true" Required="true">
+                @foreach (var group in _locationGroups)
+                {
+                    <MudSelectItem Disabled="true" Value="@("__" + group.HomeName)">
+                        <MudText Typo="Typo.overline">@group.HomeName</MudText>
+                    </MudSelectItem>
+                    @foreach (var loc in group.Locations)
+                    {
+                        @if (loc.Id != Entry.StorageLocationId)
+                        {
+                            <MudSelectItem Value="@loc.Id">@loc.Name</MudSelectItem>
+                        }
+                    }
+                }
+            </MudSelect>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Warning">Keine anderen Lagerorte vorhanden.</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Abbrechen</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Transfer"
+                   Disabled="@(string.IsNullOrEmpty(_targetLocationId) || _targetLocationId.StartsWith("__"))">
+            Umlagern
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ItemEntryWithDetails Entry { get; set; } = default!;
+
+    private int _quantity;
+    private string _targetLocationId = string.Empty;
+
+    private record LocationGroup(string HomeName, List<StorageLocation> Locations);
+    private List<LocationGroup> _locationGroups = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _quantity = Entry.Quantity;
+
+        var homes = await ShmantryService.GetHomesAsync();
+        foreach (var home in homes)
+        {
+            var locs = await ShmantryService.GetStorageLocationsAsync(home.Id);
+            var others = locs.Where(l => l.Id != Entry.StorageLocationId).ToList();
+            if (others.Count > 0)
+                _locationGroups.Add(new LocationGroup(home.Name, others));
+        }
+
+        if (_locationGroups.Count > 0 && _locationGroups[0].Locations.Count > 0)
+            _targetLocationId = _locationGroups[0].Locations[0].Id;
+    }
+
+    private async Task Transfer()
+    {
+        await ShmantryService.TransferItemAsync(Entry.Id, _targetLocationId, _quantity);
+        Snackbar.Add($"{_quantity}× '{Entry.Name}' umgelagert.", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
