@@ -334,7 +334,14 @@ window.shmantry = {
                 const app = await this._getApp();
                 const accounts = app.getAllAccounts();
                 if (accounts.length > 0) await app.logoutPopup({ account: accounts[0] });
-            } finally { this._app = null; }
+            } finally {
+                this._app = null;
+                // Clear MSAL's session-scoped interaction lock so a subsequent
+                // loginPopup doesn't fail with interaction_in_progress.
+                for (const k of [...Object.keys(sessionStorage)]) {
+                    if (k.startsWith('msal.')) sessionStorage.removeItem(k);
+                }
+            }
         }
     }
 };
