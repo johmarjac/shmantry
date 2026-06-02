@@ -88,92 +88,6 @@ window.shmantry = {
     scanBarcode: function () {
         return new Promise(async function (resolve) {
             const useNative = ('BarcodeDetector' in window);
-            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-            // ── iOS (Safari / Edge / Chrome on WebKit) ───────────────────────────
-            // Live video frame capture is unreliable on iOS WebKit. Instead open
-            // the native camera via a file input and decode the resulting still image.
-            if (!useNative && isIOS) {
-                try { await shmantry._loadZXing(); }
-                catch {
-                    shmantry._toast('Kamera-Bibliothek konnte nicht geladen werden');
-                    resolve(null);
-                    return;
-                }
-
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.capture = 'environment';
-                input.style.display = 'none';
-                document.body.appendChild(input);
-
-                // Handle "cancel" – window regains focus without a file being chosen.
-                function onWindowFocus() {
-                    setTimeout(function () {
-                        if (!input.files || input.files.length === 0) {
-                            input.remove();
-                            resolve(null);
-                        }
-                    }, 400);
-                }
-                window.addEventListener('focus', onWindowFocus, { once: true });
-
-                input.onchange = async function () {
-                    window.removeEventListener('focus', onWindowFocus);
-                    const file = input.files[0];
-                    input.remove();
-                    if (!file) { resolve(null); return; }
-
-                    const url = URL.createObjectURL(file);
-                    try {
-                        // Load the photo into an <img> so we know its natural dimensions.
-                        const img = await new Promise(function (res, rej) {
-                            const i = new Image();
-                            i.onload = function () { res(i); };
-                            i.onerror = rej;
-                            i.src = url;
-                        });
-
-                        // Scale down to ≤ 1600 px on the longer edge.
-                        // Very large photos shrink ZXing's internal canvas and miss barcodes;
-                        // too small and the barcode detail is lost. 1600 px is the sweet spot.
-                        const MAX = 1600;
-                        const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
-                        const w = Math.round(img.naturalWidth  * scale);
-                        const h = Math.round(img.naturalHeight * scale);
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width  = w;
-                        canvas.height = h;
-                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-
-                        const hints = new Map();
-                        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                            ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
-                            ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-                            ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-                            ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX
-                        ]);
-                        const reader = new ZXing.MultiFormatReader();
-                        reader.setHints(hints);
-                        const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                        const bitmap   = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-                        const result   = reader.decode(bitmap);
-                        resolve(result.getText());
-                    } catch {
-                        shmantry._toast('Kein Barcode erkannt – bitte erneut versuchen.');
-                        resolve(null);
-                    } finally {
-                        URL.revokeObjectURL(url);
-                    }
-                };
-
-                input.click();
-                return;
-            }
-
-            // ── All other browsers ───────────────────────────────────────────────
 
             if (!useNative) {
                 try { await shmantry._loadZXing(); }
@@ -188,33 +102,32 @@ window.shmantry = {
             document.body.appendChild(overlay);
 
             let active = true;
+            let stream = null;
+
+            function cleanup() {
+                active = false;
+                if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+                overlay.remove();
+                style.remove();
+            }
+
+            cancelBtn.onclick = function () { cleanup(); resolve(null); };
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' } }
+                });
+                video.srcObject = stream;
+                await video.play();
+            } catch {
+                cleanup();
+                shmantry._toast('Kamera-Zugriff verweigert');
+                resolve(null);
+                return;
+            }
 
             if (useNative) {
-                // Chrome/Edge desktop & Android – native BarcodeDetector, manage camera ourselves
-                let stream = null;
-
-                function cleanup() {
-                    active = false;
-                    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
-                    overlay.remove();
-                    style.remove();
-                }
-
-                cancelBtn.onclick = function () { cleanup(); resolve(null); };
-
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { ideal: 'environment' } }
-                    });
-                    video.srcObject = stream;
-                    await video.play();
-                } catch {
-                    cleanup();
-                    shmantry._toast('Kamera-Zugriff verweigert');
-                    resolve(null);
-                    return;
-                }
-
+                // Chrome/Edge desktop & Android – native BarcodeDetector
                 const detector = new BarcodeDetector({
                     formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code', 'data_matrix']
                 });
@@ -229,7 +142,8 @@ window.shmantry = {
                 scan();
 
             } else {
-                // ZXing fallback – Firefox and other non-iOS browsers without BarcodeDetector.
+                // ZXing canvas polling – iOS WebKit (14+) and Firefox.
+                // drawImage(video) + getImageData() works on same-origin getUserMedia streams.
                 const hints = new Map();
                 hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
                     ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
@@ -237,32 +151,28 @@ window.shmantry = {
                     ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
                     ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX
                 ]);
-                const zxReader = new ZXing.BrowserMultiFormatReader(hints);
-                let controls = null;
+                const reader = new ZXing.MultiFormatReader();
+                reader.setHints(hints);
+                const canvas = document.createElement('canvas');
 
-                function cleanup() {
-                    active = false;
-                    if (controls) { try { controls.stop(); } catch { } }
-                    overlay.remove();
-                    style.remove();
+                function pollFrame() {
+                    if (!active) return;
+                    if (video.readyState >= 2 && video.videoWidth > 0) {
+                        if (canvas.width !== video.videoWidth)  canvas.width  = video.videoWidth;
+                        if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
+                        canvas.getContext('2d').drawImage(video, 0, 0);
+                        try {
+                            const lum = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                            const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+                            const result = reader.decode(bmp);
+                            cleanup();
+                            resolve(result.getText());
+                            return;
+                        } catch { /* NotFoundException – no barcode in this frame, keep polling */ }
+                    }
+                    setTimeout(pollFrame, 150);
                 }
-
-                cancelBtn.onclick = function () { cleanup(); resolve(null); };
-
-                try {
-                    controls = await zxReader.decodeFromConstraints(
-                        { video: { facingMode: { ideal: 'environment' } } },
-                        video,
-                        function (result, error) {
-                            if (!active) return;
-                            if (result) { cleanup(); resolve(result.getText()); }
-                        }
-                    );
-                } catch {
-                    cleanup();
-                    shmantry._toast('Kamera-Zugriff verweigert');
-                    resolve(null);
-                }
+                pollFrame();
             }
         });
     },
@@ -291,8 +201,12 @@ window.shmantry = {
             if (this._app) return this._app;
             await this._loadMsal();
 
+            // auth.html is a minimal page that doesn't load Blazor.
+            // Without it, Blazor's router calls history.replaceState on load and strips
+            // the #code= hash before MSAL can read it, causing hash_empty_error.
             const base = document.querySelector('base');
-            const redirectUri = base ? base.href : (window.location.origin + '/');
+            const baseHref = base ? base.href : (window.location.origin + '/');
+            const redirectUri = baseHref + 'auth.html';
 
             this._app = new msal.PublicClientApplication({
                 auth: {
@@ -315,6 +229,7 @@ window.shmantry = {
                     return r.accessToken;
                 } catch { /* silent failed, fall through to popup */ }
             }
+            shmantry.oneDrive._clearInteractionLock();
             const r = await app.loginPopup({ scopes: this._SCOPES });
             return r.accessToken;
         },
@@ -331,8 +246,15 @@ window.shmantry = {
             return null;
         },
 
+        _clearInteractionLock: function () {
+            for (const k of [...Object.keys(sessionStorage)]) {
+                if (k.includes('interaction')) sessionStorage.removeItem(k);
+            }
+        },
+
         signIn: async function () {
             const app = await this._getApp();
+            shmantry.oneDrive._clearInteractionLock();
             await app.loginPopup({ scopes: this._SCOPES });
         },
 
@@ -358,13 +280,19 @@ window.shmantry = {
             try {
                 const app = await this._getApp();
                 const accounts = app.getAllAccounts();
-                if (accounts.length > 0) await app.logoutPopup({ account: accounts[0] });
-            } finally {
+                if (accounts.length > 0) {
+                    // logoutSilent clears the server session via hidden iframe with no popup,
+                    // so it never sets an interaction lock that can get stuck.
+                    try { await app.logoutSilent({ account: accounts[0] }); } catch { }
+                }
+            } catch { }
+            finally {
                 this._app = null;
-                // Clear MSAL's session-scoped interaction lock so a subsequent
-                // loginPopup doesn't fail with interaction_in_progress.
-                for (const k of [...Object.keys(sessionStorage)]) {
-                    if (k.startsWith('msal.')) sessionStorage.removeItem(k);
+                // Nuke all MSAL state so the next sign-in starts completely clean.
+                for (const storage of [sessionStorage, localStorage]) {
+                    for (const k of [...Object.keys(storage)]) {
+                        if (k.startsWith('msal.')) storage.removeItem(k);
+                    }
                 }
             }
         }
