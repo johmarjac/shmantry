@@ -100,7 +100,7 @@
                 }
             </MudList>
         }
-        else if (_searched)
+        else
         {
             <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
                 Dieser Artikel ist noch in keinem Lagerort vorhanden.
@@ -151,19 +151,14 @@
         _lookedUpItem = null;
         _existingEntries = [];
 
-        // Check local DB first
         var local = await ShmantryService.GetFoodItemByBarcodeAsync(_barcode.Trim());
         if (local != null)
             _lookedUpItem = local;
         else
         {
-            // Lookup OpenFoodFacts
             var off = await OpenFoodFacts.LookupBarcodeAsync(_barcode.Trim());
             if (off != null)
-            {
-                off = await ShmantryService.SaveFoodItemAsync(off);
-                _lookedUpItem = off;
-            }
+                _lookedUpItem = await ShmantryService.SaveFoodItemAsync(off);
         }
 
         _existingEntries = await ShmantryService.SearchByBarcodeAsync(_barcode.Trim());
@@ -181,15 +176,14 @@
         }
         else
         {
-            // Create a minimal food item with just the barcode
             foodItem = new FoodItem { Barcode = _barcode.Trim(), Name = _barcode.Trim() };
             foodItem = await ShmantryService.SaveFoodItemAsync(foodItem);
         }
 
-        var parameters = new DialogParameters
+        var parameters = new DialogParameters<AddItemDialog>
         {
-            ["FoodItem"] = foodItem,
-            ["StorageLocationId"] = (string?)null
+            { x => x.FoodItem, foodItem },
+            { x => x.StorageLocationId, (string?)null }
         };
         var dialog = await DialogService.ShowAsync<AddItemDialog>("Zu Lagerort hinzufügen", parameters);
         var result = await dialog.Result;

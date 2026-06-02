@@ -33,7 +33,7 @@
             @foreach (var loc in _locations)
             {
                 <MudItem xs="12" sm="6">
-                    <MudCard Style="cursor:pointer;" @onclick="() => Navigation.NavigateTo($"/storage/{loc.Id}")">
+                    <MudCard Style="cursor:pointer;" @onclick="() => GoToStorage(loc.Id)">
                         <MudCardContent Class="d-flex align-center gap-3">
                             <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Primary" Size="Size.Large" />
                             <div style="flex:1; min-width:0;">
@@ -43,10 +43,14 @@
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">@loc.Description</MudText>
                                 }
                             </div>
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
-                                           OnClick="@(async e => { e.StopPropagation(); await EditLocation(loc); })" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
-                                           OnClick="@(async e => { e.StopPropagation(); await DeleteLocation(loc); })" />
+                            <span @onclick:stopPropagation="true">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                               OnClick="@(async _ => await EditLocation(loc))" />
+                            </span>
+                            <span @onclick:stopPropagation="true">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(async _ => await DeleteLocation(loc))" />
+                            </span>
                         </MudCardContent>
                     </MudCard>
                 </MudItem>
@@ -62,7 +66,7 @@
 @code {
     [Parameter] public string HomeId { get; set; } = string.Empty;
 
-    private Home? _home;
+    private Models.Home? _home;
     private List<StorageLocation> _locations = [];
     private bool _loading = true;
 
@@ -77,9 +81,11 @@
         _loading = false;
     }
 
+    private void GoToStorage(string id) => Navigation.NavigateTo($"/storage/{id}");
+
     private async Task AddLocation()
     {
-        var parameters = new DialogParameters { ["HomeId"] = HomeId };
+        var parameters = new DialogParameters<StorageLocationDialog> { { x => x.HomeId, HomeId } };
         var dialog = await DialogService.ShowAsync<StorageLocationDialog>("Lagerort hinzufügen", parameters);
         var result = await dialog.Result;
         if (!result.Canceled) await LoadAsync();
@@ -87,7 +93,11 @@
 
     private async Task EditLocation(StorageLocation loc)
     {
-        var parameters = new DialogParameters { ["HomeId"] = HomeId, ["Location"] = loc };
+        var parameters = new DialogParameters<StorageLocationDialog>
+        {
+            { x => x.HomeId, HomeId },
+            { x => x.Location, loc }
+        };
         var dialog = await DialogService.ShowAsync<StorageLocationDialog>("Lagerort bearbeiten", parameters);
         var result = await dialog.Result;
         if (!result.Canceled) await LoadAsync();
@@ -95,7 +105,7 @@
 
     private async Task DeleteLocation(StorageLocation loc)
     {
-        var confirmed = await DialogService.ShowMessageBox(
+        var confirmed = await DialogService.ShowMessageBoxAsync(
             "Lagerort löschen",
             $"'{loc.Name}' und alle darin enthaltenen Artikel wirklich löschen?",
             yesText: "Löschen", cancelText: "Abbrechen");

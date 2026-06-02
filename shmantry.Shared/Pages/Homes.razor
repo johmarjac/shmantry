@@ -1,0 +1,108 @@
+@page "/home"
+@page "/"
+@inject IShmantryService ShmantryService
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Zuhause – Shmantry</PageTitle>
+
+<MudContainer Class="pa-4 pb-20">
+    <MudText Typo="Typo.h5" Class="mb-4">Meine Zuhause</MudText>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center mt-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_homes.Count == 0)
+    {
+        <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0"
+                  Style="border: 2px dashed var(--mud-palette-lines-default); border-radius: 12px;">
+            <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+            <MudText Typo="Typo.h6">Noch kein Zuhause angelegt</MudText>
+            <MudText Color="Color.Secondary" Class="mt-1">Tippe auf + um dein erstes Zuhause hinzuzufügen.</MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var home in _homes)
+            {
+                <MudItem xs="12" sm="6">
+                    <MudCard Style="cursor:pointer;" @onclick="() => GoToHome(home.Id)">
+                        <MudCardContent Class="d-flex align-center gap-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Home" Color="Color.Primary" Size="Size.Large" />
+                            <div style="flex:1; min-width:0;">
+                                <MudText Typo="Typo.h6" Style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@home.Name</MudText>
+                                @if (!string.IsNullOrEmpty(home.Description))
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@home.Description</MudText>
+                                }
+                            </div>
+                            <span @onclick:stopPropagation="true">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                               OnClick="@(async _ => await EditHome(home))" />
+                            </span>
+                            <span @onclick:stopPropagation="true">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(async _ => await DeleteHome(home))" />
+                            </span>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+<MudFab Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+        Style="position:fixed; bottom:72px; right:16px; z-index:100;"
+        OnClick="AddHome" />
+
+@code {
+    private List<Models.Home> _homes = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _homes = await ShmantryService.GetHomesAsync();
+        _loading = false;
+    }
+
+    private void GoToHome(string id) => Navigation.NavigateTo($"/homes/{id}");
+
+    private async Task AddHome()
+    {
+        var dialog = await DialogService.ShowAsync<HomeDialog>("Zuhause hinzufügen");
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadAsync();
+    }
+
+    private async Task EditHome(Models.Home home)
+    {
+        var parameters = new DialogParameters<HomeDialog> { { x => x.Home, home } };
+        var dialog = await DialogService.ShowAsync<HomeDialog>("Zuhause bearbeiten", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadAsync();
+    }
+
+    private async Task DeleteHome(Models.Home home)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Zuhause löschen",
+            $"'{home.Name}' und alle darin enthaltenen Lagerorte und Artikel wirklich löschen?",
+            yesText: "Löschen", cancelText: "Abbrechen");
+
+        if (confirmed == true)
+        {
+            await ShmantryService.DeleteHomeAsync(home.Id);
+            Snackbar.Add($"'{home.Name}' gelöscht.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+}

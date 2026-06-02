@@ -9,7 +9,7 @@
 <MudContainer Class="pa-4 pb-20">
     <div class="d-flex align-center gap-2 mb-1">
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                       OnClick="@(() => Navigation.NavigateTo($"/homes/{_location?.HomeId}"))" />
+                       OnClick="@(() => Navigation.NavigateTo(_location != null ? $"/homes/{_location.HomeId}" : "/home"))" />
         <div style="flex:1;">
             <MudText Typo="Typo.h5">@(_location?.Name ?? "…")</MudText>
             @if (!string.IsNullOrEmpty(_location?.Description))
@@ -74,7 +74,7 @@
                             {
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">@entry.Brand</MudText>
                             }
-                            <div class="d-flex align-center gap-2 mt-1">
+                            <div class="d-flex align-center gap-2 mt-1 flex-wrap">
                                 <MudChip T="string" Size="Size.Small" Color="Color.Primary" Label="true">
                                     @entry.Quantity ×
                                 </MudChip>
@@ -128,13 +128,14 @@
     private async Task LoadAsync()
     {
         _loading = true;
+
         var homes = await ShmantryService.GetHomesAsync();
-        // load location info
+        _location = null;
         foreach (var h in homes)
         {
             var locs = await ShmantryService.GetStorageLocationsAsync(h.Id);
-            _location = locs.FirstOrDefault(l => l.Id == LocationId);
-            if (_location != null) break;
+            var found = locs.FirstOrDefault(l => l.Id == LocationId);
+            if (found != null) { _location = found; break; }
         }
 
         _entries = await ShmantryService.GetItemEntriesAsync(LocationId);
@@ -145,7 +146,7 @@
 
     private async Task AddItem()
     {
-        var parameters = new DialogParameters { ["StorageLocationId"] = LocationId };
+        var parameters = new DialogParameters<AddItemDialog> { { x => x.StorageLocationId, LocationId } };
         var dialog = await DialogService.ShowAsync<AddItemDialog>("Artikel hinzufügen", parameters);
         var result = await dialog.Result;
         if (!result.Canceled) await LoadAsync();
@@ -162,11 +163,11 @@
             BestBeforeDate = entry.BestBeforeDate,
             Notes = entry.Notes
         };
-        var parameters = new DialogParameters
+        var parameters = new DialogParameters<AddItemDialog>
         {
-            ["StorageLocationId"] = LocationId,
-            ["ExistingEntry"] = itemEntry,
-            ["FoodItemName"] = entry.Name
+            { x => x.StorageLocationId, LocationId },
+            { x => x.ExistingEntry, itemEntry },
+            { x => x.FoodItemName, entry.Name }
         };
         var dialog = await DialogService.ShowAsync<AddItemDialog>("Artikel bearbeiten", parameters);
         var result = await dialog.Result;
@@ -175,7 +176,7 @@
 
     private async Task TransferEntry(ItemEntryWithDetails entry)
     {
-        var parameters = new DialogParameters { ["Entry"] = entry };
+        var parameters = new DialogParameters<TransferDialog> { { x => x.Entry, entry } };
         var dialog = await DialogService.ShowAsync<TransferDialog>("Artikel umlagern", parameters);
         var result = await dialog.Result;
         if (!result.Canceled) await LoadAsync();
@@ -183,7 +184,7 @@
 
     private async Task DeleteEntry(ItemEntryWithDetails entry)
     {
-        var confirmed = await DialogService.ShowMessageBox(
+        var confirmed = await DialogService.ShowMessageBoxAsync(
             "Artikel löschen",
             $"'{entry.Name}' aus diesem Lagerort entfernen?",
             yesText: "Löschen", cancelText: "Abbrechen");
