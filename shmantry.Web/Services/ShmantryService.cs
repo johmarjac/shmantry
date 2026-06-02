@@ -3,11 +3,12 @@ using shmantry.Shared.Services;
 
 namespace shmantry.Web.Services;
 
-// In-memory implementation for the browser/server version.
-// Replace with a proper persistence layer (e.g., IndexedDB via JS interop for WASM) as needed.
+// In-memory implementation for WASM.
+// Data lives only for the current session. Persistence via IndexedDB or JSON export/import
+// can be added later. The setup screen is skipped — WASM has no local database file concept.
 public class ShmantryService : IShmantryService
 {
-    private bool _initialized = false;
+    private bool _initialized = true; // WASM: no file setup needed, start directly
     private readonly List<Home> _homes = [];
     private readonly List<StorageLocation> _locations = [];
     private readonly List<FoodItem> _foodItems = [];
