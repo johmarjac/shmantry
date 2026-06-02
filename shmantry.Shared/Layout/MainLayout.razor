@@ -1,6 +1,28 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
 
+<style>
+    .shm-nav-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 6px 0;
+        cursor: pointer;
+        user-select: none;
+        background: none;
+        border: none;
+        width: 100%;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .shm-nav-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+    }
+</style>
+
 <MudLayout>
     <MudMainContent Class="pb-16">
         @Body
@@ -8,22 +30,22 @@
     <MudAppBar Bottom="true" Fixed="true" Color="Color.Dark" Elevation="8" Dense="true">
         <MudGrid Justify="Justify.Center" Spacing="0" Class="w-100">
             <MudItem xs="4" Class="d-flex justify-center">
-                <MudIconButton Icon="@Icons.Material.Filled.Home"
-                               Color="@NavColor("/home")"
-                               OnClick="@(() => Navigation.NavigateTo("home"))"
-                               Size="Size.Large" />
+                <button class="shm-nav-btn" @onclick="@(() => Navigation.NavigateTo("home"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Home" Color="@NavColor("/home")" />
+                    <span class="shm-nav-label" style="color:@NavColorHex("/home");">Dashboard</span>
+                </button>
             </MudItem>
             <MudItem xs="4" Class="d-flex justify-center">
-                <MudIconButton Icon="@Icons.Material.Filled.QrCodeScanner"
-                               Color="@NavColor("/scan")"
-                               OnClick="@(() => Navigation.NavigateTo("scan"))"
-                               Size="Size.Large" />
+                <button class="shm-nav-btn" @onclick="@(() => Navigation.NavigateTo("inventory"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Kitchen" Color="@NavColor("/inventory")" />
+                    <span class="shm-nav-label" style="color:@NavColorHex("/inventory");">Vorräte</span>
+                </button>
             </MudItem>
             <MudItem xs="4" Class="d-flex justify-center">
-                <MudIconButton Icon="@Icons.Material.Filled.Settings"
-                               Color="@NavColor("/settings")"
-                               OnClick="@(() => Navigation.NavigateTo("settings"))"
-                               Size="Size.Large" />
+                <button class="shm-nav-btn" @onclick="@(() => Navigation.NavigateTo("settings"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Settings" Color="@NavColor("/settings")" />
+                    <span class="shm-nav-label" style="color:@NavColorHex("/settings");">Einstellungen</span>
+                </button>
             </MudItem>
         </MudGrid>
     </MudAppBar>
@@ -32,4 +54,7 @@
 @code {
     private Color NavColor(string path) =>
         Navigation.Uri.Contains(path) ? Color.Primary : Color.Default;
+
+    private string NavColorHex(string path) =>
+        Navigation.Uri.Contains(path) ? "#fd8122" : "#6e6e73";
 }

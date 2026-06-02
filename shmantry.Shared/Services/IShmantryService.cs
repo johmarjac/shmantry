@@ -23,6 +23,7 @@ public interface IShmantryService : IDisposable
     Task<FoodItem> SaveFoodItemAsync(FoodItem item);
 
     Task<List<ItemEntryWithDetails>> GetItemEntriesAsync(string storageLocationId);
+    Task<List<ItemEntryWithDetails>> GetAllItemEntriesAsync();
     Task<List<ItemEntryWithDetails>> SearchByBarcodeAsync(string barcode);
     Task<ItemEntry> AddItemEntryAsync(string storageLocationId, string foodItemId, int quantity, DateTime? bestBeforeDate = null, string? notes = null);
     Task UpdateItemEntryAsync(ItemEntry entry);

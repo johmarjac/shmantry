@@ -182,6 +182,13 @@ public class ShmantryService : IShmantryService
         return await EnrichAsync(entries);
     }
 
+    public async Task<List<ItemEntryWithDetails>> GetAllItemEntriesAsync()
+    {
+        await EnsureDbAsync();
+        var entries = await _db!.Table<ItemEntry>().ToListAsync();
+        return await EnrichAsync(entries);
+    }
+
     public async Task<List<ItemEntryWithDetails>> SearchByBarcodeAsync(string barcode)
     {
         await EnsureDbAsync();

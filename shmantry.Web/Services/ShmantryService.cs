@@ -105,6 +105,7 @@ public class ShmantryService : IShmantryService
 
     // --- Item Entries ---
 
+
     public Task<List<ItemEntryWithDetails>> GetItemEntriesAsync(string storageLocationId)
     {
         var result = _entries
@@ -113,6 +114,9 @@ public class ShmantryService : IShmantryService
             .ToList();
         return Task.FromResult(result);
     }
+
+    public Task<List<ItemEntryWithDetails>> GetAllItemEntriesAsync() =>
+        Task.FromResult(_entries.Select(e => Enrich(e)).ToList());
 
     public Task<List<ItemEntryWithDetails>> SearchByBarcodeAsync(string barcode)
     {
