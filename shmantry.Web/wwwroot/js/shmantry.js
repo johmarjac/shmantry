@@ -205,18 +205,18 @@ window.shmantry = {
             });
         },
 
+        _CLIENT_ID: '2ecd8dad-f10f-4632-b1a1-11923f9dcfc2',
+
         _getApp: async function () {
             if (this._app) return this._app;
             await this._loadMsal();
-            const clientId = this.getClientId();
-            if (!clientId) throw new Error('Keine Azure App-ID hinterlegt. Bitte in den Einstellungen eintragen.');
 
             const base = document.querySelector('base');
             const redirectUri = base ? base.href : (window.location.origin + '/');
 
             this._app = new msal.PublicClientApplication({
                 auth: {
-                    clientId: clientId,
+                    clientId: this._CLIENT_ID,
                     authority: 'https://login.microsoftonline.com/consumers',
                     redirectUri: redirectUri
                 },
@@ -239,19 +239,7 @@ window.shmantry = {
             return r.accessToken;
         },
 
-        getClientId: function () { return localStorage.getItem('shmantry_od_cid') || ''; },
-
-        setClientId: function (id) {
-            const v = (id || '').trim();
-            if (v) localStorage.setItem('shmantry_od_cid', v);
-            else localStorage.removeItem('shmantry_od_cid');
-            this._app = null;
-        },
-
-        isConfigured: function () { return !!this.getClientId(); },
-
         isSignedIn: async function () {
-            if (!this.isConfigured()) return false;
             try { return (await this._getApp()).getAllAccounts().length > 0; } catch { return false; }
         },
 

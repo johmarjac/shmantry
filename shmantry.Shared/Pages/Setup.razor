@@ -123,13 +123,6 @@
 
     private async Task ImportFromOneDrive()
     {
-        var configured = await JS.InvokeAsync<bool>("shmantry.oneDrive.isConfigured");
-        if (!configured)
-        {
-            Snackbar.Add("Bitte zuerst die Azure App-ID in den Einstellungen (⚙) eintragen.", Severity.Warning);
-            return;
-        }
-
         _busy = true;
         try
         {
