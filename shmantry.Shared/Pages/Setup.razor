@@ -5,7 +5,6 @@
 @inject ISnackbar Snackbar
 @inject IFormFactor FormFactor
 @inject IJSRuntime JS
-@inject IDialogService DialogService
 
 <MudContainer Class="d-flex flex-column align-center justify-center text-center gap-3 pa-6" Style="height: 100vh; max-width: 420px;">
     <MudImage Src="_content/shmantry.Shared/assets/logo.png" Fluid="true" Style="max-width:120px;" />
@@ -124,20 +123,26 @@
 
     private async Task ImportFromOneDrive()
     {
-        var dialog = await DialogService.ShowAsync<OneDriveLinkDialog>("Von OneDrive laden");
-        var result = await dialog.Result;
-        if (result.Canceled) return;
+        var configured = await JS.InvokeAsync<bool>("shmantry.oneDrive.isConfigured");
+        if (!configured)
+        {
+            Snackbar.Add("Bitte zuerst die Azure App-ID in den Einstellungen (⚙) eintragen.", Severity.Warning);
+            return;
+        }
 
-        var url = (string)result.Data!;
         _busy = true;
         try
         {
-            var json = await JS.InvokeAsync<string?>("shmantry.fetchOneDriveLink", url);
-            if (json != null)
+            var json = await JS.InvokeAsync<string?>("shmantry.oneDrive.loadFile");
+            if (json == null)
+            {
+                Snackbar.Add("Keine Sicherung in OneDrive gefunden. Exportiere zuerst über die Einstellungen.", Severity.Info);
+            }
+            else
             {
                 var ok = await ShmantryService.ImportDataAsync(json);
                 if (ok) { Navigation.NavigateTo("home"); return; }
-                Snackbar.Add("Datei konnte nicht importiert werden.", Severity.Error);
+                Snackbar.Add("Daten konnten nicht importiert werden.", Severity.Error);
             }
         }
         catch (Exception ex)

@@ -13,21 +13,115 @@
 
     @if (FormFactor.GetFormFactor() == "Web")
     {
+        @* ── OneDrive ──────────────────────────────────────────────────────── *@
         <MudPaper Class="pa-4 mb-4" Elevation="2">
-            <MudText Typo="Typo.subtitle1" Class="mb-1">Daten sichern</MudText>
+            <div class="d-flex align-center gap-2 mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Cloud" Color="Color.Primary" />
+                <MudText Typo="Typo.subtitle1">OneDrive-Synchronisation</MudText>
+            </div>
+
+            @if (!_jsReady)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else if (!_odConfigured)
+            {
+                <MudExpansionPanels Class="mb-3">
+                    <MudExpansionPanel Text="Azure App-ID einrichten (einmalig)">
+                        <MudText Typo="Typo.body2" Class="mb-2">
+                            Shmantry benötigt eine eigene Azure-App-Registrierung, damit es sicher
+                            auf deinen OneDrive zugreifen kann. Die Einrichtung ist einmalig.
+                        </MudText>
+                        <ol style="margin:0;padding-left:1.5rem;font-size:0.85rem;color:var(--mud-palette-text-secondary);line-height:1.8;">
+                            <li>Öffne <strong>portal.azure.com</strong> und melde dich an</li>
+                            <li>Suche „App-Registrierungen" → <strong>Neue Registrierung</strong></li>
+                            <li>Name: <em>Shmantry</em> (beliebig)</li>
+                            <li>Kontotypen: <strong>Nur persönliche Microsoft-Konten</strong></li>
+                            <li>Umleitungs-URI → <strong>Single-Page-Application (SPA)</strong><br />
+                                URI: <code>@_redirectUri</code></li>
+                            <li>Klicke <strong>Registrieren</strong></li>
+                            <li>Kopiere die <strong>Anwendungs-ID (Client-ID)</strong></li>
+                            <li>API-Berechtigungen → Hinzufügen → Microsoft Graph → Delegiert:<br />
+                                <strong>Files.ReadWrite.AppFolder</strong> und <strong>User.Read</strong></li>
+                        </ol>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+
+                <div class="d-flex gap-2 align-center">
+                    <MudTextField @bind-Value="_clientId" Label="Azure App-ID (Client-ID)"
+                                  Variant="Variant.Outlined" FullWidth="true"
+                                  Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               OnClick="SaveClientId"
+                               Disabled="@(string.IsNullOrWhiteSpace(_clientId) || _busy)">
+                        Speichern
+                    </MudButton>
+                </div>
+            }
+            else if (!_odSignedIn)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    App-ID hinterlegt. Melde dich mit deinem Microsoft-Konto an.
+                </MudText>
+                <div class="d-flex gap-2 flex-wrap">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Login"
+                               OnClick="SignIn" Disabled="@_busy">
+                        Anmelden
+                    </MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary"
+                               OnClick="ClearClientId" Disabled="@_busy">
+                        App-ID ändern
+                    </MudButton>
+                </div>
+            }
+            else
+            {
+                <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"
+                         Size="Size.Small" Class="mb-3">
+                    @_accountName
+                </MudChip>
+                <div class="d-flex gap-2 flex-wrap">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                               OnClick="SaveToOneDrive" Disabled="@_busy">
+                        In OneDrive speichern
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.CloudDownload"
+                               OnClick="LoadFromOneDrive" Disabled="@_busy">
+                        Von OneDrive laden
+                    </MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary"
+                               OnClick="SignOut" Disabled="@_busy">
+                        Abmelden
+                    </MudButton>
+                </div>
+            }
+        </MudPaper>
+
+        @* ── Local backup ──────────────────────────────────────────────────── *@
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <div class="d-flex align-center gap-2 mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.FolderZip" Color="Color.Primary" />
+                <MudText Typo="Typo.subtitle1">Lokale Sicherung</MudText>
+            </div>
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                Exportiere alle Daten als JSON-Datei. Speichere sie in OneDrive oder Dropbox,
-                um sie beim nächsten Seitenbesuch wieder zu importieren.
+                Exportiere alle Daten als JSON-Datei auf dein Gerät.
             </MudText>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Download"
-                       OnClick="ExportData" Disabled="@_busy">
-                Daten exportieren
+                       OnClick="ExportLocal" Disabled="@_busy">
+                Exportieren
             </MudButton>
         </MudPaper>
 
+        @* ── Reset ─────────────────────────────────────────────────────────── *@
         <MudPaper Class="pa-4" Elevation="2">
-            <MudText Typo="Typo.subtitle1" Class="mb-1">Zurücksetzen</MudText>
+            <div class="d-flex align-center gap-2 mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Error" />
+                <MudText Typo="Typo.subtitle1">Zurücksetzen</MudText>
+            </div>
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
                 Alle lokalen Daten löschen und zur Startseite zurückkehren.
             </MudText>
@@ -49,12 +143,134 @@
             </MudText>
         </MudPaper>
     }
+
+    @if (_busy)
+    {
+        <div class="d-flex justify-center mt-4">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
 </MudContainer>
 
 @code {
+    private bool _jsReady;
     private bool _busy;
+    private bool _odConfigured;
+    private bool _odSignedIn;
+    private string? _accountName;
+    private string _clientId = string.Empty;
+    private string _redirectUri = string.Empty;
 
-    private async Task ExportData()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _redirectUri = await JS.InvokeAsync<string>("eval",
+            "document.querySelector('base')?.href ?? (window.location.origin + '/')");
+        _clientId = await JS.InvokeAsync<string>("shmantry.oneDrive.getClientId");
+        _odConfigured = await JS.InvokeAsync<bool>("shmantry.oneDrive.isConfigured");
+        if (_odConfigured)
+        {
+            _odSignedIn = await JS.InvokeAsync<bool>("shmantry.oneDrive.isSignedIn");
+            if (_odSignedIn)
+                _accountName = await JS.InvokeAsync<string?>("shmantry.oneDrive.getAccountName");
+        }
+        _jsReady = true;
+        StateHasChanged();
+    }
+
+    private async Task SaveClientId()
+    {
+        await JS.InvokeVoidAsync("shmantry.oneDrive.setClientId", _clientId);
+        _odConfigured = true;
+        _odSignedIn = false;
+        StateHasChanged();
+    }
+
+    private async Task ClearClientId()
+    {
+        await JS.InvokeVoidAsync("shmantry.oneDrive.setClientId", (object?)null);
+        _clientId = string.Empty;
+        _odConfigured = false;
+        _odSignedIn = false;
+        _accountName = null;
+        StateHasChanged();
+    }
+
+    private async Task SignIn()
+    {
+        _busy = true;
+        try
+        {
+            await JS.InvokeVoidAsync("shmantry.oneDrive.signIn");
+            _odSignedIn = true;
+            _accountName = await JS.InvokeAsync<string?>("shmantry.oneDrive.getAccountName");
+            Snackbar.Add("Erfolgreich angemeldet.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Anmeldefehler: {ex.Message}", Severity.Error);
+        }
+        _busy = false;
+    }
+
+    private async Task SignOut()
+    {
+        _busy = true;
+        try
+        {
+            await JS.InvokeVoidAsync("shmantry.oneDrive.signOut");
+            _odSignedIn = false;
+            _accountName = null;
+            Snackbar.Add("Abgemeldet.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler: {ex.Message}", Severity.Error);
+        }
+        _busy = false;
+    }
+
+    private async Task SaveToOneDrive()
+    {
+        _busy = true;
+        try
+        {
+            var json = await ShmantryService.ExportDataAsync();
+            await JS.InvokeVoidAsync("shmantry.oneDrive.saveFile", json);
+            Snackbar.Add("In OneDrive gespeichert.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler: {ex.Message}", Severity.Error);
+        }
+        _busy = false;
+    }
+
+    private async Task LoadFromOneDrive()
+    {
+        _busy = true;
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("shmantry.oneDrive.loadFile");
+            if (json == null)
+            {
+                Snackbar.Add("Keine Sicherung in OneDrive gefunden.", Severity.Info);
+            }
+            else
+            {
+                var ok = await ShmantryService.ImportDataAsync(json);
+                if (ok) { Snackbar.Add("Daten aus OneDrive geladen.", Severity.Success); Navigation.NavigateTo("home"); return; }
+                Snackbar.Add("Daten konnten nicht importiert werden.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler: {ex.Message}", Severity.Error);
+        }
+        _busy = false;
+    }
+
+    private async Task ExportLocal()
     {
         _busy = true;
         try
@@ -74,7 +290,7 @@
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "Daten zurücksetzen",
-            "Alle Daten unwiderruflich löschen?",
+            "Alle lokalen Daten unwiderruflich löschen?",
             yesText: "Zurücksetzen", cancelText: "Abbrechen");
 
         if (confirmed == true)
