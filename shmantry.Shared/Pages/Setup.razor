@@ -6,80 +6,156 @@
 @inject IFormFactor FormFactor
 @inject IJSRuntime JS
 
-<MudContainer Class="d-flex flex-column align-center justify-center text-center gap-3 pa-6" Style="height: 100vh; max-width: 420px;">
-    @if (FormFactor.GetFormFactor() == "Web")
-    {
-        <MudImage Src="logo.svg" Fluid="true" Style="max-width:120px;" />
+<style>
+    .shm-opt {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 15px 14px;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.12s;
     }
-    else
-    {
-        <MudImage Src="_content/shmantry.Shared/assets/logo.png" Fluid="true" Style="max-width:120px;" />
+    .shm-opt:hover  { background: rgba(255,255,255,0.04); }
+    .shm-opt:active { background: rgba(255,255,255,0.08); }
+    .shm-opt-icon {
+        width: 44px; height: 44px;
+        border-radius: 11px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
     }
-    <div>
-        <MudText Typo="Typo.h4" Class="mb-1">Shmantry</MudText>
-        <MudText Typo="Typo.subtitle1" Color="Color.Secondary">Deine Vorräte auf einen Blick</MudText>
+    .shm-opt-title { font-size: 15px; font-weight: 600; color: #f0f0f0; line-height: 1.3; }
+    .shm-opt-sub   { font-size: 12px; color: #6e6e73; margin-top: 2px; }
+    .shm-sep { height: 1px; background: #2c2c2e; margin: 0 14px; }
+    .shm-card { background: #1c1c1e; border-radius: 16px; overflow: hidden; }
+</style>
+
+<MudContainer Class="d-flex flex-column align-center justify-center pa-5"
+              Style="height: 100vh; max-width: 400px;">
+
+    @* ── Logo + title ── *@
+    <div class="d-flex flex-column align-center mb-8" style="gap: 10px;">
+        @if (FormFactor.GetFormFactor() == "Web")
+        {
+            <img src="logo.svg" style="width:84px;height:84px;border-radius:20px;box-shadow:0 4px 24px rgba(0,0,0,.5);" alt="Shmantry" />
+        }
+        else
+        {
+            <img src="_content/shmantry.Shared/assets/logo.png" style="width:84px;height:84px;border-radius:20px;box-shadow:0 4px 24px rgba(0,0,0,.5);" alt="Shmantry" />
+        }
+        <MudText Typo="Typo.h4" Style="font-weight:700;letter-spacing:-0.5px;margin:0;">Shmantry</MudText>
+        <MudText Style="color:#6e6e73;font-size:14px;margin:0;">Deine Vorräte. Immer im Blick.</MudText>
     </div>
 
+    @* ── Option list ── *@
     @if (FormFactor.GetFormFactor() == "Web")
     {
-        <MudPaper Class="pa-4 w-100" Elevation="2">
-            <MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
-                Starte frisch oder importiere eine vorhandene Sicherung.
-                Exportiere deine Daten regelmäßig über die Einstellungen, um sie in OneDrive
-                oder Dropbox zu sichern.
-            </MudText>
+        <div class="shm-card w-100">
 
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                       Class="mb-2" StartIcon="@Icons.Material.Filled.PlayArrow"
-                       OnClick="StartFresh" Disabled="@_busy">
-                Frisch starten
-            </MudButton>
+            @* New DB *@
+            <div class="shm-opt" @onclick="StartFresh"
+                 style="@(_busy ? "opacity:.4;pointer-events:none;" : "")">
+                <div class="shm-opt-icon" style="background:rgba(253,129,34,.14);">
+                    <MudIcon Icon="@Icons.Material.Filled.AddCircle" Style="color:#fd8122;" />
+                </div>
+                <div style="flex:1;">
+                    <div class="shm-opt-title">Neue Datenbank erstellen</div>
+                    <div class="shm-opt-sub">Starte mit einer leeren Datenbank</div>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Style="color:#3d3d3f;" />
+            </div>
 
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
-                       Class="mb-2" StartIcon="@Icons.Material.Filled.FolderOpen"
-                       OnClick="ImportFromLocalFile" Disabled="@_busy">
-                Aus Datei importieren
-            </MudButton>
+            <div class="shm-sep"></div>
 
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
-                       StartIcon="@Icons.Material.Filled.Cloud"
-                       OnClick="ImportFromOneDrive" Disabled="@_busy">
-                Von OneDrive laden
-            </MudButton>
-        </MudPaper>
+            @* Import local *@
+            <div class="shm-opt" @onclick="ImportFromLocalFile"
+                 style="@(_busy ? "opacity:.4;pointer-events:none;" : "")">
+                <div class="shm-opt-icon" style="background:rgba(253,129,34,.14);">
+                    <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Style="color:#fd8122;" />
+                </div>
+                <div style="flex:1;">
+                    <div class="shm-opt-title">Lokal importieren</div>
+                    <div class="shm-opt-sub">Sicherung von deinem Gerät laden</div>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Style="color:#3d3d3f;" />
+            </div>
+
+            <div class="shm-sep"></div>
+
+            @* OneDrive *@
+            <div class="shm-opt" @onclick="ImportFromOneDrive"
+                 style="@(_busy ? "opacity:.4;pointer-events:none;" : "")">
+                <div class="shm-opt-icon" style="background:rgba(0,120,212,.18);">
+                    @((MarkupString)_oneDriveSvg)
+                </div>
+                <div style="flex:1;">
+                    <div class="shm-opt-title">Mit OneDrive einloggen</div>
+                    <div class="shm-opt-sub">Sicherung aus Microsoft OneDrive</div>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Style="color:#3d3d3f;" />
+            </div>
+
+        </div>
     }
     else
     {
-        <MudPaper Class="pa-4 w-100" Elevation="2">
-            <MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
-                Wähle eine vorhandene Datenbank oder erstelle eine neue. Die Datenbankdatei kann in einem
-                Sync-Ordner (Dropbox, OneDrive…) gespeichert werden, um sie auf mehreren Geräten zu nutzen.
-            </MudText>
+        <div class="shm-card w-100">
 
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                       Class="mb-2" StartIcon="@Icons.Material.Filled.CreateNewFolder"
-                       OnClick="CreateDatabase" Disabled="@_busy">
-                Neue Datenbank erstellen
-            </MudButton>
+            @* Create DB *@
+            <div class="shm-opt" @onclick="CreateDatabase"
+                 style="@(_busy ? "opacity:.4;pointer-events:none;" : "")">
+                <div class="shm-opt-icon" style="background:rgba(253,129,34,.14);">
+                    <MudIcon Icon="@Icons.Material.Filled.CreateNewFolder" Style="color:#fd8122;" />
+                </div>
+                <div style="flex:1;">
+                    <div class="shm-opt-title">Neue Datenbank erstellen</div>
+                    <div class="shm-opt-sub">Neue SQLite-Datenbank anlegen</div>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Style="color:#3d3d3f;" />
+            </div>
 
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
-                       StartIcon="@Icons.Material.Filled.FolderOpen"
-                       OnClick="OpenDatabase" Disabled="@_busy">
-                Datenbank öffnen
-            </MudButton>
-        </MudPaper>
+            <div class="shm-sep"></div>
+
+            @* Open DB *@
+            <div class="shm-opt" @onclick="OpenDatabase"
+                 style="@(_busy ? "opacity:.4;pointer-events:none;" : "")">
+                <div class="shm-opt-icon" style="background:rgba(253,129,34,.14);">
+                    <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Style="color:#fd8122;" />
+                </div>
+                <div style="flex:1;">
+                    <div class="shm-opt-title">Datenbank öffnen</div>
+                    <div class="shm-opt-sub">Vorhandene SQLite-Datei öffnen</div>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Style="color:#3d3d3f;" />
+            </div>
+
+        </div>
     }
 
     @if (_busy)
     {
-        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        <div class="d-flex justify-center mt-6">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
     }
 </MudContainer>
 
 @code {
     private bool _busy;
 
-    // --- MAUI ---
+    // OneDrive two-cloud logo: left cloud = light blue (#28a8e0), right = dark blue (#0078d4)
+    private static readonly string _oneDriveSvg =
+        """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20" width="28" height="18">""" +
+        """<rect fill="#28a8e0" x="0" y="9" width="17" height="11" rx="5.5"/>""" +
+        """<circle fill="#28a8e0" cx="5.5" cy="9" r="5.5"/>""" +
+        """<circle fill="#28a8e0" cx="11.5" cy="6.5" r="4.5"/>""" +
+        """<rect fill="#0078d4" x="9" y="5" width="21" height="15" rx="7"/>""" +
+        """<circle fill="#0078d4" cx="17" cy="5" r="6"/>""" +
+        """<circle fill="#0078d4" cx="23.5" cy="2.5" r="7"/>""" +
+        """</svg>""";
+
+    // ── MAUI ─────────────────────────────────────────────────────────────────
 
     private async Task CreateDatabase()
     {
@@ -99,7 +175,7 @@
         else Snackbar.Add("Datenbank konnte nicht geöffnet werden.", Severity.Error);
     }
 
-    // --- Web ---
+    // ── Web ──────────────────────────────────────────────────────────────────
 
     private async Task StartFresh()
     {
