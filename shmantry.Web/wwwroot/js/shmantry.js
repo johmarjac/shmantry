@@ -102,35 +102,34 @@ window.shmantry = {
             const { overlay, video, cancelBtn, style } = shmantry._createScanOverlay();
             document.body.appendChild(overlay);
 
-            let stream = null;
             let active = true;
-            let scanTimer = null;
-
-            function cleanup() {
-                active = false;
-                if (scanTimer) clearTimeout(scanTimer);
-                if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
-                overlay.remove();
-                style.remove();
-            }
-
-            cancelBtn.onclick = function () { cleanup(); resolve(null); };
-
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' } }
-                });
-                video.srcObject = stream;
-                await video.play();
-            } catch {
-                cleanup();
-                shmantry._toast('Kamera-Zugriff verweigert');
-                resolve(null);
-                return;
-            }
 
             if (useNative) {
-                // Chrome/Edge desktop & Android – native BarcodeDetector
+                // Chrome/Edge desktop & Android – native BarcodeDetector, manage camera ourselves
+                let stream = null;
+
+                function cleanup() {
+                    active = false;
+                    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+                    overlay.remove();
+                    style.remove();
+                }
+
+                cancelBtn.onclick = function () { cleanup(); resolve(null); };
+
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' } }
+                    });
+                    video.srcObject = stream;
+                    await video.play();
+                } catch {
+                    cleanup();
+                    shmantry._toast('Kamera-Zugriff verweigert');
+                    resolve(null);
+                    return;
+                }
+
                 const detector = new BarcodeDetector({
                     formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code', 'data_matrix']
                 });
@@ -143,8 +142,10 @@ window.shmantry = {
                     }).catch(function () { if (active) requestAnimationFrame(scan); });
                 }
                 scan();
+
             } else {
-                // ZXing fallback – iOS Safari, Firefox, all other browsers
+                // ZXing fallback – iOS Safari, Firefox, all other browsers.
+                // Let ZXing manage the camera via decodeFromConstraints (handles getUserMedia internally).
                 const hints = new Map();
                 hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
                     ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
@@ -153,25 +154,34 @@ window.shmantry = {
                     ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX
                 ]);
                 const zxReader = new ZXing.BrowserMultiFormatReader(hints);
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
+                let controls = null;
 
-                function scanFrame() {
-                    if (!active) return;
-                    if (video.readyState >= 2 && video.videoWidth > 0) {
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        ctx.drawImage(video, 0, 0);
-                        try {
-                            const result = zxReader.decodeFromCanvas(canvas);
-                            cleanup();
-                            resolve(result.getText());
-                            return;
-                        } catch { /* no barcode this frame */ }
-                    }
-                    scanTimer = setTimeout(scanFrame, 300);
+                function cleanup() {
+                    active = false;
+                    if (controls) { try { controls.stop(); } catch { } }
+                    overlay.remove();
+                    style.remove();
                 }
-                scanFrame();
+
+                cancelBtn.onclick = function () { cleanup(); resolve(null); };
+
+                try {
+                    // decodeFromConstraints starts the camera, attaches stream to video,
+                    // and fires the callback on every frame (result=null if no barcode yet).
+                    controls = await zxReader.decodeFromConstraints(
+                        { video: { facingMode: { ideal: 'environment' } } },
+                        video,
+                        function (result, error) {
+                            if (!active) return;
+                            if (result) { cleanup(); resolve(result.getText()); }
+                            // error here is just NotFoundException (no barcode in frame) — ignore
+                        }
+                    );
+                } catch {
+                    cleanup();
+                    shmantry._toast('Kamera-Zugriff verweigert');
+                    resolve(null);
+                }
             }
         });
     },
@@ -195,18 +205,18 @@ window.shmantry = {
             });
         },
 
+        _CLIENT_ID: '2ecd8dad-f10f-4632-b1a1-11923f9dcfc2',
+
         _getApp: async function () {
             if (this._app) return this._app;
             await this._loadMsal();
-            const clientId = this.getClientId();
-            if (!clientId) throw new Error('Keine Azure App-ID hinterlegt. Bitte in den Einstellungen eintragen.');
 
             const base = document.querySelector('base');
             const redirectUri = base ? base.href : (window.location.origin + '/');
 
             this._app = new msal.PublicClientApplication({
                 auth: {
-                    clientId: clientId,
+                    clientId: this._CLIENT_ID,
                     authority: 'https://login.microsoftonline.com/consumers',
                     redirectUri: redirectUri
                 },
@@ -229,19 +239,7 @@ window.shmantry = {
             return r.accessToken;
         },
 
-        getClientId: function () { return localStorage.getItem('shmantry_od_cid') || ''; },
-
-        setClientId: function (id) {
-            const v = (id || '').trim();
-            if (v) localStorage.setItem('shmantry_od_cid', v);
-            else localStorage.removeItem('shmantry_od_cid');
-            this._app = null;
-        },
-
-        isConfigured: function () { return !!this.getClientId(); },
-
         isSignedIn: async function () {
-            if (!this.isConfigured()) return false;
             try { return (await this._getApp()).getAllAccounts().length > 0; } catch { return false; }
         },
 

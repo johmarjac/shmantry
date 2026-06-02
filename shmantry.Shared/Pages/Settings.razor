@@ -24,56 +24,17 @@
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" />
             }
-            else if (!_odConfigured)
-            {
-                <MudExpansionPanels Class="mb-3">
-                    <MudExpansionPanel Text="Azure App-ID einrichten (einmalig)">
-                        <MudText Typo="Typo.body2" Class="mb-2">
-                            Shmantry benötigt eine eigene Azure-App-Registrierung, damit es sicher
-                            auf deinen OneDrive zugreifen kann. Die Einrichtung ist einmalig.
-                        </MudText>
-                        <ol style="margin:0;padding-left:1.5rem;font-size:0.85rem;color:var(--mud-palette-text-secondary);line-height:1.8;">
-                            <li>Öffne <strong>portal.azure.com</strong> und melde dich an</li>
-                            <li>Suche „App-Registrierungen" → <strong>Neue Registrierung</strong></li>
-                            <li>Name: <em>Shmantry</em> (beliebig)</li>
-                            <li>Kontotypen: <strong>Nur persönliche Microsoft-Konten</strong></li>
-                            <li>Umleitungs-URI → <strong>Single-Page-Application (SPA)</strong><br />
-                                URI: <code>@_redirectUri</code></li>
-                            <li>Klicke <strong>Registrieren</strong></li>
-                            <li>Kopiere die <strong>Anwendungs-ID (Client-ID)</strong></li>
-                            <li>API-Berechtigungen → Hinzufügen → Microsoft Graph → Delegiert:<br />
-                                <strong>Files.ReadWrite.AppFolder</strong> und <strong>User.Read</strong></li>
-                        </ol>
-                    </MudExpansionPanel>
-                </MudExpansionPanels>
-
-                <div class="d-flex gap-2 align-center">
-                    <MudTextField @bind-Value="_clientId" Label="Azure App-ID (Client-ID)"
-                                  Variant="Variant.Outlined" FullWidth="true"
-                                  Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                               OnClick="SaveClientId"
-                               Disabled="@(string.IsNullOrWhiteSpace(_clientId) || _busy)">
-                        Speichern
-                    </MudButton>
-                </div>
-            }
             else if (!_odSignedIn)
             {
                 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                    App-ID hinterlegt. Melde dich mit deinem Microsoft-Konto an.
+                    Melde dich mit deinem Microsoft-Konto an, um Daten automatisch in
+                    deinem OneDrive zu sichern und geräteübergreifend zu synchronisieren.
                 </MudText>
-                <div class="d-flex gap-2 flex-wrap">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Login"
-                               OnClick="SignIn" Disabled="@_busy">
-                        Anmelden
-                    </MudButton>
-                    <MudButton Variant="Variant.Text" Color="Color.Secondary"
-                               OnClick="ClearClientId" Disabled="@_busy">
-                        App-ID ändern
-                    </MudButton>
-                </div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Login"
+                           OnClick="SignIn" Disabled="@_busy">
+                    Mit Microsoft anmelden
+                </MudButton>
             }
             else
             {
@@ -155,44 +116,16 @@
 @code {
     private bool _jsReady;
     private bool _busy;
-    private bool _odConfigured;
     private bool _odSignedIn;
     private string? _accountName;
-    private string _clientId = string.Empty;
-    private string _redirectUri = string.Empty;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-        _redirectUri = await JS.InvokeAsync<string>("eval",
-            "document.querySelector('base')?.href ?? (window.location.origin + '/')");
-        _clientId = await JS.InvokeAsync<string>("shmantry.oneDrive.getClientId");
-        _odConfigured = await JS.InvokeAsync<bool>("shmantry.oneDrive.isConfigured");
-        if (_odConfigured)
-        {
-            _odSignedIn = await JS.InvokeAsync<bool>("shmantry.oneDrive.isSignedIn");
-            if (_odSignedIn)
-                _accountName = await JS.InvokeAsync<string?>("shmantry.oneDrive.getAccountName");
-        }
+        _odSignedIn = await JS.InvokeAsync<bool>("shmantry.oneDrive.isSignedIn");
+        if (_odSignedIn)
+            _accountName = await JS.InvokeAsync<string?>("shmantry.oneDrive.getAccountName");
         _jsReady = true;
-        StateHasChanged();
-    }
-
-    private async Task SaveClientId()
-    {
-        await JS.InvokeVoidAsync("shmantry.oneDrive.setClientId", _clientId);
-        _odConfigured = true;
-        _odSignedIn = false;
-        StateHasChanged();
-    }
-
-    private async Task ClearClientId()
-    {
-        await JS.InvokeVoidAsync("shmantry.oneDrive.setClientId", (object?)null);
-        _clientId = string.Empty;
-        _odConfigured = false;
-        _odSignedIn = false;
-        _accountName = null;
         StateHasChanged();
     }
 
