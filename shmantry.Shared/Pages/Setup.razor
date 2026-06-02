@@ -3,32 +3,66 @@
 @inject IShmantryService ShmantryService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IFormFactor FormFactor
+@inject IJSRuntime JS
+@inject IDialogService DialogService
 
 <MudContainer Class="d-flex flex-column align-center justify-center text-center gap-3 pa-6" Style="height: 100vh; max-width: 420px;">
-    <MudImage Src="/assets/logo.png" Fluid="true" Style="max-width:120px;" />
+    <MudImage Src="_content/shmantry.Shared/assets/logo.png" Fluid="true" Style="max-width:120px;" />
     <div>
         <MudText Typo="Typo.h4" Class="mb-1">Shmantry</MudText>
         <MudText Typo="Typo.subtitle1" Color="Color.Secondary">Deine Vorräte auf einen Blick</MudText>
     </div>
 
-    <MudPaper Class="pa-4 w-100" Elevation="2">
-        <MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
-            Wähle eine vorhandene Datenbank oder erstelle eine neue. Die Datenbankdatei kann in einem
-            Sync-Ordner (Dropbox, OneDrive…) gespeichert werden, um sie auf mehreren Geräten zu nutzen.
-        </MudText>
+    @if (FormFactor.GetFormFactor() == "Web")
+    {
+        <MudPaper Class="pa-4 w-100" Elevation="2">
+            <MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
+                Starte frisch oder importiere eine vorhandene Sicherung.
+                Exportiere deine Daten regelmäßig über die Einstellungen, um sie in OneDrive
+                oder Dropbox zu sichern.
+            </MudText>
 
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                   Class="mb-2" StartIcon="@Icons.Material.Filled.CreateNewFolder"
-                   OnClick="CreateDatabase" Disabled="@_busy">
-            Neue Datenbank erstellen
-        </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                       Class="mb-2" StartIcon="@Icons.Material.Filled.PlayArrow"
+                       OnClick="StartFresh" Disabled="@_busy">
+                Frisch starten
+            </MudButton>
 
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
-                   StartIcon="@Icons.Material.Filled.FolderOpen"
-                   OnClick="OpenDatabase" Disabled="@_busy">
-            Datenbank öffnen
-        </MudButton>
-    </MudPaper>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       Class="mb-2" StartIcon="@Icons.Material.Filled.FolderOpen"
+                       OnClick="ImportFromLocalFile" Disabled="@_busy">
+                Aus Datei importieren
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.Cloud"
+                       OnClick="ImportFromOneDrive" Disabled="@_busy">
+                Von OneDrive laden
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="pa-4 w-100" Elevation="2">
+            <MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
+                Wähle eine vorhandene Datenbank oder erstelle eine neue. Die Datenbankdatei kann in einem
+                Sync-Ordner (Dropbox, OneDrive…) gespeichert werden, um sie auf mehreren Geräten zu nutzen.
+            </MudText>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                       Class="mb-2" StartIcon="@Icons.Material.Filled.CreateNewFolder"
+                       OnClick="CreateDatabase" Disabled="@_busy">
+                Neue Datenbank erstellen
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.FolderOpen"
+                       OnClick="OpenDatabase" Disabled="@_busy">
+                Datenbank öffnen
+            </MudButton>
+        </MudPaper>
+    }
 
     @if (_busy)
     {
@@ -39,16 +73,15 @@
 @code {
     private bool _busy;
 
+    // --- MAUI ---
+
     private async Task CreateDatabase()
     {
         _busy = true;
         var ok = await ShmantryService.CreateDatabaseAsync();
         _busy = false;
-
-        if (ok)
-            Navigation.NavigateTo("home");
-        else
-            Snackbar.Add("Datenbank konnte nicht erstellt werden.", Severity.Error);
+        if (ok) Navigation.NavigateTo("home");
+        else Snackbar.Add("Datenbank konnte nicht erstellt werden.", Severity.Error);
     }
 
     private async Task OpenDatabase()
@@ -56,10 +89,61 @@
         _busy = true;
         var ok = await ShmantryService.OpenDatabaseAsync();
         _busy = false;
+        if (ok) Navigation.NavigateTo("home");
+        else Snackbar.Add("Datenbank konnte nicht geöffnet werden.", Severity.Error);
+    }
 
-        if (ok)
-            Navigation.NavigateTo("home");
-        else
-            Snackbar.Add("Datenbank konnte nicht geöffnet werden.", Severity.Error);
+    // --- Web ---
+
+    private async Task StartFresh()
+    {
+        _busy = true;
+        await ShmantryService.CreateDatabaseAsync();
+        Navigation.NavigateTo("home");
+    }
+
+    private async Task ImportFromLocalFile()
+    {
+        _busy = true;
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("shmantry.pickLocalFile");
+            if (json != null)
+            {
+                var ok = await ShmantryService.ImportDataAsync(json);
+                if (ok) { Navigation.NavigateTo("home"); return; }
+                Snackbar.Add("Datei konnte nicht importiert werden. Ist es eine gültige Shmantry-Sicherung?", Severity.Error);
+            }
+        }
+        catch
+        {
+            Snackbar.Add("Fehler beim Öffnen der Datei.", Severity.Error);
+        }
+        _busy = false;
+    }
+
+    private async Task ImportFromOneDrive()
+    {
+        var dialog = await DialogService.ShowAsync<OneDriveLinkDialog>("Von OneDrive laden");
+        var result = await dialog.Result;
+        if (result.Canceled) return;
+
+        var url = (string)result.Data!;
+        _busy = true;
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("shmantry.fetchOneDriveLink", url);
+            if (json != null)
+            {
+                var ok = await ShmantryService.ImportDataAsync(json);
+                if (ok) { Navigation.NavigateTo("home"); return; }
+                Snackbar.Add("Datei konnte nicht importiert werden.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"OneDrive-Fehler: {ex.Message}", Severity.Error);
+        }
+        _busy = false;
     }
 }

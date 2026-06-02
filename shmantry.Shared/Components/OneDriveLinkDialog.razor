@@ -1,0 +1,27 @@
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            Erstelle in OneDrive einen Freigabelink für deine Shmantry-Backup-Datei (.json)
+            und stelle sicher, dass „Jeder mit dem Link kann anzeigen" ausgewählt ist.
+        </MudText>
+        <MudTextField @bind-Value="_url" Label="OneDrive-Freigabelink" Variant="Variant.Outlined"
+                      FullWidth="true" Placeholder="https://1drv.ms/…"
+                      HelperText="Link aus OneDrive → Teilen → Link kopieren" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Abbrechen</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Submit" Disabled="@string.IsNullOrWhiteSpace(_url)">
+            Laden
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _url = string.Empty;
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(_url.Trim()));
+    private void Cancel() => MudDialog.Cancel();
+}

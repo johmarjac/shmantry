@@ -1,14 +1,13 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using shmantry.Shared.Models;
 using shmantry.Shared.Services;
 
 namespace shmantry.Web.Services;
 
-// In-memory implementation for WASM.
-// Data lives only for the current session. Persistence via IndexedDB or JSON export/import
-// can be added later. The setup screen is skipped — WASM has no local database file concept.
 public class ShmantryService : IShmantryService
 {
-    private bool _initialized = true; // WASM: no file setup needed, start directly
+    private bool _initialized = false;
     private readonly List<Home> _homes = [];
     private readonly List<StorageLocation> _locations = [];
     private readonly List<FoodItem> _foodItems = [];
@@ -203,6 +202,36 @@ public class ShmantryService : IShmantryService
             Notes = e.Notes,
             CreatedAt = e.CreatedAt
         };
+    }
+
+    private static readonly JsonSerializerOptions _json = new() { WriteIndented = true };
+
+    private record ExportData(
+        List<Home> Homes,
+        List<StorageLocation> Locations,
+        List<FoodItem> FoodItems,
+        List<ItemEntry> Entries);
+
+    public Task<string> ExportDataAsync()
+    {
+        var data = new ExportData(_homes.ToList(), _locations.ToList(), _foodItems.ToList(), _entries.ToList());
+        return Task.FromResult(JsonSerializer.Serialize(data, _json));
+    }
+
+    public Task<bool> ImportDataAsync(string json)
+    {
+        try
+        {
+            var data = JsonSerializer.Deserialize<ExportData>(json, _json);
+            if (data == null) return Task.FromResult(false);
+            _homes.Clear(); _homes.AddRange(data.Homes);
+            _locations.Clear(); _locations.AddRange(data.Locations);
+            _foodItems.Clear(); _foodItems.AddRange(data.FoodItems);
+            _entries.Clear(); _entries.AddRange(data.Entries);
+            _initialized = true;
+            return Task.FromResult(true);
+        }
+        catch { return Task.FromResult(false); }
     }
 
     public void Dispose() { }

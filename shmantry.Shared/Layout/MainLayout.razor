@@ -19,6 +19,12 @@
                                OnClick="@(() => Navigation.NavigateTo("scan"))"
                                Size="Size.Large" />
             </MudItem>
+            <MudItem xs="4" Class="d-flex justify-center">
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="@NavColor("/settings")"
+                               OnClick="@(() => Navigation.NavigateTo("settings"))"
+                               Size="Size.Large" />
+            </MudItem>
         </MudGrid>
     </MudAppBar>
 </MudLayout>

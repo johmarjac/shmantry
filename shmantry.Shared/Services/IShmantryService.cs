@@ -28,4 +28,7 @@ public interface IShmantryService : IDisposable
     Task UpdateItemEntryAsync(ItemEntry entry);
     Task DeleteItemEntryAsync(string entryId);
     Task TransferItemAsync(string entryId, string targetStorageLocationId, int quantity);
+
+    Task<string> ExportDataAsync();
+    Task<bool> ImportDataAsync(string json);
 }

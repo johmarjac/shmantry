@@ -1,10 +1,16 @@
+using Microsoft.JSInterop;
 using shmantry.Shared.Services;
 
 namespace shmantry.Web.Services;
 
 public class BarcodeScannerService : IBarcodeScannerService
 {
-    public bool IsSupported => false;
+    private readonly IJSRuntime _js;
 
-    public Task<string?> ScanBarcodeAsync() => Task.FromResult<string?>(null);
+    public BarcodeScannerService(IJSRuntime js) => _js = js;
+
+    public bool IsSupported => true;
+
+    public async Task<string?> ScanBarcodeAsync() =>
+        await _js.InvokeAsync<string?>("shmantry.scanBarcode");
 }
