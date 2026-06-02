@@ -127,6 +127,27 @@ window.shmantry = {
 
                     const url = URL.createObjectURL(file);
                     try {
+                        // Load the photo into an <img> so we know its natural dimensions.
+                        const img = await new Promise(function (res, rej) {
+                            const i = new Image();
+                            i.onload = function () { res(i); };
+                            i.onerror = rej;
+                            i.src = url;
+                        });
+
+                        // Scale down to ≤ 1600 px on the longer edge.
+                        // Very large photos shrink ZXing's internal canvas and miss barcodes;
+                        // too small and the barcode detail is lost. 1600 px is the sweet spot.
+                        const MAX = 1600;
+                        const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+                        const w = Math.round(img.naturalWidth  * scale);
+                        const h = Math.round(img.naturalHeight * scale);
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width  = w;
+                        canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
                         const hints = new Map();
                         hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
                             ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
@@ -134,7 +155,11 @@ window.shmantry = {
                             ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
                             ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX
                         ]);
-                        const result = await new ZXing.BrowserMultiFormatReader(hints).decodeFromImageUrl(url);
+                        const reader = new ZXing.MultiFormatReader();
+                        reader.setHints(hints);
+                        const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                        const bitmap   = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+                        const result   = reader.decode(bitmap);
                         resolve(result.getText());
                     } catch {
                         shmantry._toast('Kein Barcode erkannt – bitte erneut versuchen.');
