@@ -82,7 +82,7 @@
                 Kein Produkt gefunden. Gib einen Namen ein um fortzufahren.
             </MudAlert>
             <MudTextField @bind-Value="_manualName" Label="Produktname" Variant="Variant.Outlined"
-                          FullWidth="true" Class="mt-3" />
+                          FullWidth="true" Immediate="true" Class="mt-3" />
             <MudButton Color="Color.Primary" Class="mt-2" OnClick="UseManualName"
                        Disabled="@string.IsNullOrWhiteSpace(_manualName)">
                 Weiter

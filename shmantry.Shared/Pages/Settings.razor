@@ -221,9 +221,47 @@
         try
         {
             var json = await JS.InvokeAsync<string?>("shmantry.oneDrive.loadFile");
-            if (json == null)
+            if (string.IsNullOrEmpty(json))
             {
                 Snackbar.Add("Keine Sicherung in OneDrive gefunden.", Severity.Info);
+                _busy = false;
+                return;
+            }
+
+            var odData = System.Text.Json.JsonSerializer.Deserialize<ExportData>(json);
+            bool hasConflict = odData?.ExportedAt != null
+                && ShmantryService.LastExportedAt.HasValue
+                && Math.Abs((odData.ExportedAt.Value - ShmantryService.LastExportedAt.Value).TotalSeconds) >= 10;
+
+            if (hasConflict)
+            {
+                var p = new DialogParameters<ConflictDialog>
+                {
+                    { x => x.LocalTimestamp,    ShmantryService.LastExportedAt },
+                    { x => x.OneDriveTimestamp, odData!.ExportedAt }
+                };
+                var d = await DialogService.ShowAsync<ConflictDialog>("Sync-Konflikt", p);
+                var result = await d.Result;
+                if (result.Canceled) { _busy = false; return; }
+                if (result.Data is not ConflictDialog.ConflictChoice choice) { _busy = false; return; }
+
+                switch (choice)
+                {
+                    case ConflictDialog.ConflictChoice.KeepLocal:
+                        Snackbar.Add("Lokaler Stand behalten.", Severity.Info);
+                        _busy = false;
+                        return;
+                    case ConflictDialog.ConflictChoice.LoadOneDrive:
+                        await ShmantryService.ImportDataAsync(json);
+                        Snackbar.Add("Von OneDrive geladen.", Severity.Success);
+                        Navigation.NavigateTo("home");
+                        return;
+                    case ConflictDialog.ConflictChoice.Merge:
+                        await ShmantryService.MergeDataAsync(json);
+                        Snackbar.Add("Stände zusammengeführt.", Severity.Success);
+                        Navigation.NavigateTo("home");
+                        return;
+                }
             }
             else
             {

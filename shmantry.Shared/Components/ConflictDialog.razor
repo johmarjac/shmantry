@@ -1,0 +1,55 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.SyncProblem" Class="mr-2" Color="Color.Warning" />
+            Sync-Konflikt erkannt
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
+            Lokaler Stand und OneDrive-Stand unterscheiden sich.
+            Bitte wähle, wie fortgefahren werden soll.
+        </MudAlert>
+        <div class="d-flex gap-4 mb-2 flex-wrap">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Lokal gespeichert</MudText>
+                <MudText Typo="Typo.body2">
+                    @(LocalTimestamp.HasValue ? LocalTimestamp.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "–")
+                </MudText>
+            </div>
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">OneDrive-Stand</MudText>
+                <MudText Typo="Typo.body2">
+                    @(OneDriveTimestamp.HasValue ? OneDriveTimestamp.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "–")
+                </MudText>
+            </div>
+        </div>
+        <MudDivider Class="my-3" />
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            <strong>Lokal behalten</strong> – OneDrive-Änderungen verwerfen.<br />
+            <strong>Von OneDrive laden</strong> – lokale Änderungen verwerfen.<br />
+            <strong>Zusammenführen</strong> – beide Stände kombinieren (OneDrive-Einträge, die lokal fehlen, werden hinzugefügt).
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Close(DialogResult.Ok(ConflictChoice.KeepLocal)))">
+            Lokal behalten
+        </MudButton>
+        <MudButton Color="Color.Warning"
+                   OnClick="@(() => MudDialog.Close(DialogResult.Ok(ConflictChoice.LoadOneDrive)))">
+            Von OneDrive laden
+        </MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="@(() => MudDialog.Close(DialogResult.Ok(ConflictChoice.Merge)))">
+            Zusammenführen
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    public enum ConflictChoice { KeepLocal, LoadOneDrive, Merge }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public DateTime? LocalTimestamp { get; set; }
+    [Parameter] public DateTime? OneDriveTimestamp { get; set; }
+}

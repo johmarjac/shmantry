@@ -10,9 +10,9 @@
     </TitleContent>
     <DialogContent>
         <MudTextField @bind-Value="_name" Label="Name" Variant="Variant.Outlined"
-                      FullWidth="true" Required="true" Class="mb-3" />
+                      FullWidth="true" Required="true" Immediate="true" Class="mb-3" />
         <MudTextField @bind-Value="_description" Label="Beschreibung (optional)"
-                      Variant="Variant.Outlined" FullWidth="true" Lines="2" />
+                      Variant="Variant.Outlined" FullWidth="true" Lines="2" Immediate="true" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Abbrechen</MudButton>
