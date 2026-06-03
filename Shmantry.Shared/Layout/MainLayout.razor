@@ -1,5 +1,64 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Navigation
 
-<main>
-    @Body
-</main>
+<MudThemeProvider Theme="_theme" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider FullWidth="true" MaxWidth="MaxWidth.Small" />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Dense="true" Color="Color.Dark">
+        <MudText Typo="Typo.h6" Style="font-weight:700;">Shmantry</MudText>
+        <MudSpacer />
+    </MudAppBar>
+
+    <MudMainContent Class="pb-16">
+        <MudContainer MaxWidth="MaxWidth.Small" Class="pa-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+
+    <MudAppBar Bottom="true" Fixed="true" Elevation="4" Dense="true" Color="Color.Dark">
+        <MudGrid Justify="Justify.SpaceEvenly" Spacing="0" Class="w-100">
+            <MudItem xs="4" Class="d-flex justify-center">
+                <MudIconButton Icon="@Icons.Material.Filled.Home"
+                               Color="@(IsActive("/") ? Color.Primary : Color.Default)"
+                               OnClick="@(() => Navigation.NavigateTo("/"))" />
+            </MudItem>
+            <MudItem xs="4" Class="d-flex justify-center">
+                <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                               Color="@(IsActive("/settings") ? Color.Primary : Color.Default)"
+                               OnClick="@(() => Navigation.NavigateTo("/settings"))" />
+            </MudItem>
+        </MudGrid>
+    </MudAppBar>
+</MudLayout>
+
+@code {
+    private static MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#594ae2",
+            Secondary = "#ff4081",
+            AppbarBackground = "#1e1e2e",
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#594ae2",
+            Secondary = "#ff4081",
+            AppbarBackground = "#1e1e2e",
+            Background = "#121212",
+            Surface = "#1e1e2e",
+            DrawerBackground = "#1e1e2e",
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography { FontFamily = ["Roboto", "sans-serif"] }
+        }
+    };
+
+    private bool IsActive(string path) =>
+        path == "/" ? Navigation.Uri.TrimEnd('/').EndsWith(Navigation.BaseUri.TrimEnd('/'))
+                    : Navigation.Uri.Contains(path);
+}
