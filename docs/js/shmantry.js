@@ -297,23 +297,15 @@ window.shmantry = {
             if (!resp.ok) throw new Error('Graph API HTTP ' + resp.status);
         },
 
-        signOut: async function () {
-            try {
-                const app = await this._getApp();
-                const accounts = app.getAllAccounts();
-                if (accounts.length > 0) {
-                    // logoutSilent clears the server session via hidden iframe with no popup,
-                    // so it never sets an interaction lock that can get stuck.
-                    try { await app.logoutSilent({ account: accounts[0] }); } catch { }
-                }
-            } catch { }
-            finally {
-                this._app = null;
-                // Nuke all MSAL state so the next sign-in starts completely clean.
-                for (const storage of [sessionStorage, localStorage]) {
-                    for (const k of [...Object.keys(storage)]) {
-                        if (k.startsWith('msal.')) storage.removeItem(k);
-                    }
+        signOut: function () {
+            this._app = null;
+            // MSAL v2 uses "msal." prefix; v3 may also key by clientId.
+            // Clear everything matching either pattern so no version leaves state behind.
+            const cid = this._CLIENT_ID.toLowerCase();
+            for (const storage of [sessionStorage, localStorage]) {
+                for (const k of [...Object.keys(storage)]) {
+                    const kl = k.toLowerCase();
+                    if (kl.startsWith('msal.') || kl.includes(cid)) storage.removeItem(k);
                 }
             }
         }
