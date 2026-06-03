@@ -215,6 +215,12 @@
         public string GroupKey => $"{FoodItemId}|{StorageLocationId}";
     }
 
+    [SupplyParameterFromQuery(Name = "homeId")]
+    public string? HomeIdParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "locationId")]
+    public string? LocationIdParam { get; set; }
+
     private bool _loading = true;
     private List<ItemEntryWithDetails> _allEntries = [];
     private List<Models.Home> _homes = [];
@@ -229,6 +235,15 @@
         _loading = true;
         _homes = await ShmantryService.GetHomesAsync();
         _allEntries = await ShmantryService.GetAllItemEntriesAsync();
+
+        if (!string.IsNullOrEmpty(HomeIdParam))
+        {
+            _filterHomeId = HomeIdParam;
+            _filteredLocations = await ShmantryService.GetStorageLocationsAsync(HomeIdParam);
+            if (!string.IsNullOrEmpty(LocationIdParam))
+                _filterLocationId = LocationIdParam;
+        }
+
         _loading = false;
     }
 

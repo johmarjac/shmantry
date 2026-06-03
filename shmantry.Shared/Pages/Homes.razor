@@ -48,11 +48,11 @@
                 else
                 {
                     <div style="flex-shrink:0;">
-                        <MudChart T="double" ChartType="ChartType.Donut"
+                        <MudChart T="double" ChartType="@ChartType.Donut"
                                   InputData="@_chartData"
                                   InputLabels="@_chartLabels"
                                   Width="140px" Height="140px"
-                                  ChartOptions="_chartOptions" />
+                                  ChartOptions="@_chartOptions" />
                     </div>
                 }
                 <div class="d-flex flex-column gap-2" style="flex:1;min-width:150px;">
@@ -136,13 +136,21 @@
                             {
                                 var stats = GetLocationStats(loc.Id);
                                 <div class="tree-loc-row" style="border-top:1px solid #2c2c2e;"
-                                     @onclick="() => GoToStorage(loc.Id)">
+                                     @onclick="() => GoToInventoryFiltered(hd.Home.Id, loc.Id)">
                                     <MudIcon Icon="@Icons.Material.Filled.Inventory2"
                                              Size="Size.Small" Style="color:#6e6e73;flex-shrink:0;" />
                                     <span style="font-size:14px;color:#e0e0e0;flex:1;overflow:hidden;
                                                  text-overflow:ellipsis;white-space:nowrap;">
                                         @loc.Name
                                     </span>
+                                    @if (stats.Total > 0)
+                                    {
+                                        <span style="background:#2c2c2e;color:#9e9e9e;border-radius:10px;
+                                                     padding:1px 8px;font-size:12px;font-weight:600;
+                                                     white-space:nowrap;flex-shrink:0;">
+                                            @stats.Total
+                                        </span>
+                                    }
                                     @if (stats.Fresh > 0)
                                     {
                                         <span style="background:#1b3a1f;color:#4caf50;border-radius:10px;
@@ -190,7 +198,7 @@
 
 @code {
     private sealed record HomeData(Models.Home Home, List<StorageLocation> Locations);
-    private sealed record LocationStats(int Fresh, int Soon, int Expired);
+    private sealed record LocationStats(int Total, int Fresh, int Soon, int Expired);
 
     private bool _loading = true;
     private List<HomeData> _homeData = [];
@@ -238,13 +246,14 @@
     {
         var entries = _allEntries.Where(e => e.StorageLocationId == locationId).ToList();
         return new LocationStats(
+            Total:   entries.Sum(e => e.Quantity),
             Fresh:   entries.Where(e => e.BestBeforeDate.HasValue && !e.IsExpiringSoon).Sum(e => e.Quantity),
             Soon:    entries.Where(e => e.IsExpiringSoon && !e.IsExpired).Sum(e => e.Quantity),
             Expired: entries.Where(e => e.IsExpired).Sum(e => e.Quantity));
     }
 
-    private void GoToStorage(string locationId) =>
-        Navigation.NavigateTo($"storage/{locationId}");
+    private void GoToInventoryFiltered(string homeId, string locationId) =>
+        Navigation.NavigateTo($"inventory?homeId={Uri.EscapeDataString(homeId)}&locationId={Uri.EscapeDataString(locationId)}");
 
     private void ToggleHome(string homeId)
     {
