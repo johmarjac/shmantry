@@ -3,6 +3,7 @@
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject IBarcodeScannerService BarcodeScanner
 
 <PageTitle>Vorräte – Shmantry</PageTitle>
 
@@ -199,6 +200,29 @@
     }
 </MudContainer>
 
+<div style="position:fixed;bottom:72px;right:16px;z-index:100;display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+    @if (_fabOpen)
+    {
+        <div class="d-flex align-center gap-2">
+            <MudPaper Elevation="3" Class="px-3 py-1" Style="border-radius:20px;background:#2c2c2e;">
+                <MudText Typo="Typo.caption" Style="white-space:nowrap;">Barcode scannen</MudText>
+            </MudPaper>
+            <MudFab Color="Color.Secondary" StartIcon="@Icons.Material.Filled.QrCodeScanner"
+                    Size="Size.Small" OnClick="ScanAndAdd" />
+        </div>
+        <div class="d-flex align-center gap-2">
+            <MudPaper Elevation="3" Class="px-3 py-1" Style="border-radius:20px;background:#2c2c2e;">
+                <MudText Typo="Typo.caption" Style="white-space:nowrap;">Manuell hinzufügen</MudText>
+            </MudPaper>
+            <MudFab Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
+                    Size="Size.Small" OnClick="AddItem" />
+        </div>
+    }
+    <MudFab Color="Color.Primary"
+            StartIcon="@(_fabOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.Add)"
+            OnClick="@(() => _fabOpen = !_fabOpen)" />
+</div>
+
 @code {
     private enum SortMode { Name, Brand, BestBefore, Quantity, CreatedAt }
 
@@ -224,6 +248,7 @@
     public string? LocationIdParam { get; set; }
 
     private bool _loading = true;
+    private bool _fabOpen;
     private List<ItemEntryWithDetails> _allEntries = [];
     private List<Models.Home> _homes = [];
     private List<StorageLocation> _filteredLocations = [];
@@ -319,6 +344,24 @@
             { x => x.StorageLocationId, first.StorageLocationId }
         };
         var d = await DialogService.ShowAsync<QuickAddDialog>("Hinzufügen", p);
+        if (!(await d.Result).Canceled) await Reload();
+    }
+
+    private async Task AddItem()
+    {
+        _fabOpen = false;
+        var d = await DialogService.ShowAsync<AddItemDialog>("Artikel hinzufügen");
+        if (!(await d.Result).Canceled) await Reload();
+    }
+
+    private async Task ScanAndAdd()
+    {
+        _fabOpen = false;
+        if (!BarcodeScanner.IsSupported) return;
+        var barcode = await BarcodeScanner.ScanBarcodeAsync();
+        if (string.IsNullOrEmpty(barcode)) return;
+        var p = new DialogParameters<AddItemDialog> { { x => x.InitialBarcode, barcode } };
+        var d = await DialogService.ShowAsync<AddItemDialog>("Artikel hinzufügen", p);
         if (!(await d.Result).Canceled) await Reload();
     }
 
