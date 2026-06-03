@@ -1,12 +1,21 @@
-<Router AppAssembly="typeof(Routes).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <PageTitle>Nicht gefunden</PageTitle>
-        <LayoutView Layout="typeof(Layout.MainLayout)">
-            <p>Diese Seite wurde nicht gefunden.</p>
-        </LayoutView>
-    </NotFound>
-</Router>
+@using System.Reflection
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(Routes).Assembly" AdditionalAssemblies="@_additionalAssemblies">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Nicht gefunden</PageTitle>
+            <LayoutView Layout="typeof(Layout.MainLayout)">
+                <p>Diese Seite wurde nicht gefunden.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+@code {
+    private static readonly Assembly[] _additionalAssemblies =
+        Assembly.GetEntryAssembly() is { } a && a != typeof(Routes).Assembly ? [a] : [];
+}
