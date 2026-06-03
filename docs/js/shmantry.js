@@ -46,34 +46,63 @@ window.shmantry = {
 
     _createScanOverlay: function () {
         const style = document.createElement('style');
-        style.textContent = '@keyframes shmScan{0%,100%{top:15%}50%{top:78%}}';
+        style.textContent = `
+            @keyframes shmScan { 0%,100%{top:8%} 50%{top:82%} }
+            .shm-vf { position:relative; width:min(85vw,320px); aspect-ratio:1/1; }
+            .shm-vf video {
+                position:absolute; inset:0; width:100%; height:100%;
+                object-fit:cover; border-radius:8px; background:#000;
+            }
+            .shm-vf-frame {
+                position:absolute; inset:0; border-radius:8px;
+                box-shadow: 0 0 0 4000px rgba(0,0,0,0.75);
+                pointer-events:none;
+            }
+            .shm-vf-corner {
+                position:absolute; width:20px; height:20px;
+                border-color:#fd8122; border-style:solid; border-width:0;
+            }
+            .shm-vf-corner.tl { top:0; left:0;  border-top-width:3px; border-left-width:3px;  border-radius:4px 0 0 0; }
+            .shm-vf-corner.tr { top:0; right:0; border-top-width:3px; border-right-width:3px; border-radius:0 4px 0 0; }
+            .shm-vf-corner.bl { bottom:0; left:0;  border-bottom-width:3px; border-left-width:3px;  border-radius:0 0 0 4px; }
+            .shm-vf-corner.br { bottom:0; right:0; border-bottom-width:3px; border-right-width:3px; border-radius:0 0 4px 0; }
+            .shm-scan-line {
+                position:absolute; left:4%; right:4%; height:2px;
+                background:#fd8122; box-shadow:0 0 8px #fd8122;
+                animation:shmScan 1.8s ease-in-out infinite;
+            }
+        `;
         document.head.appendChild(style);
 
         const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;';
 
-        const videoWrap = document.createElement('div');
-        videoWrap.style.cssText = 'position:relative;width:min(90vw,400px);';
+        const vfWrap = document.createElement('div');
+        vfWrap.className = 'shm-vf';
 
         const video = document.createElement('video');
         video.setAttribute('playsinline', '');
         video.setAttribute('muted', '');
-        video.style.cssText = 'width:100%;border-radius:8px;background:#000;display:block;';
+        video.setAttribute('autoplay', '');
 
-        const scanLine = document.createElement('div');
-        scanLine.style.cssText = 'position:absolute;left:8%;right:8%;height:2px;background:#fd8122;box-shadow:0 0 10px #fd8122;animation:shmScan 2s ease-in-out infinite;';
+        const frame   = document.createElement('div'); frame.className = 'shm-vf-frame';
+        const tl = document.createElement('div'); tl.className = 'shm-vf-corner tl';
+        const tr = document.createElement('div'); tr.className = 'shm-vf-corner tr';
+        const bl = document.createElement('div'); bl.className = 'shm-vf-corner bl';
+        const br = document.createElement('div'); br.className = 'shm-vf-corner br';
+        const line = document.createElement('div'); line.className = 'shm-scan-line';
 
-        videoWrap.append(video, scanLine);
+        vfWrap.append(video, frame, tl, tr, bl, br, line);
 
         const hint = document.createElement('p');
-        hint.textContent = 'Barcode in den Rahmen halten…';
-        hint.style.cssText = 'color:#ccc;margin:0;font-family:Roboto,sans-serif;font-size:14px;';
+        hint.textContent = 'Barcode im Rahmen zentrieren';
+        hint.style.cssText = 'color:#ccc;margin:0;font-family:Roboto,sans-serif;font-size:14px;text-align:center;';
 
         const cancelBtn = document.createElement('button');
         cancelBtn.textContent = 'Abbrechen';
-        cancelBtn.style.cssText = 'padding:10px 32px;background:#fd8122;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:1rem;font-family:Roboto,sans-serif;';
+        cancelBtn.style.cssText = 'padding:10px 32px;background:#fd8122;color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:1rem;font-family:Roboto,sans-serif;';
 
-        overlay.append(videoWrap, hint, cancelBtn);
+        overlay.append(vfWrap, hint, cancelBtn);
         return { overlay, video, cancelBtn, style };
     },
 
@@ -93,8 +122,7 @@ window.shmantry = {
                 try { await shmantry._loadZXing(); }
                 catch {
                     shmantry._toast('Kamera-Bibliothek konnte nicht geladen werden');
-                    resolve(null);
-                    return;
+                    resolve(null); return;
                 }
             }
 
@@ -113,75 +141,84 @@ window.shmantry = {
 
             cancelBtn.onclick = function () { cleanup(); resolve(null); };
 
-            // Try environment-facing first (mobile), fall back to any camera (desktop)
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' } }
-                });
-            } catch {
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                } catch (err) {
-                    cleanup();
-                    const n = err && err.name ? err.name : '';
-                    const msg =
-                        (n === 'NotReadableError' || n === 'TrackStartError')
-                            ? 'Kamera wird von einer anderen App verwendet – bitte schließen und erneut versuchen'
-                        : (n === 'NotFoundError' || n === 'DevicesNotFoundError')
-                            ? 'Keine Kamera gefunden'
-                        : (n === 'NotAllowedError' || n === 'PermissionDeniedError')
-                            ? 'Kamera-Zugriff verweigert'
-                        : 'Kamera konnte nicht geöffnet werden' + (err.message ? ': ' + err.message : '');
-                    shmantry._toast(msg);
-                    resolve(null);
-                    return;
-                }
+            // Request high resolution for sharper barcodes; cascade down on failure
+            const camConstraints = [
+                { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+                { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+                { video: { facingMode: { ideal: 'environment' } } },
+                { video: true }
+            ];
+
+            for (const c of camConstraints) {
+                try { stream = await navigator.mediaDevices.getUserMedia(c); break; }
+                catch { stream = null; }
             }
+
+            if (!stream) {
+                cleanup();
+                shmantry._toast('Kamera konnte nicht geöffnet werden');
+                resolve(null); return;
+            }
+
             try {
                 video.srcObject = stream;
                 await video.play();
             } catch {
                 cleanup();
                 shmantry._toast('Kamera konnte nicht gestartet werden');
-                resolve(null);
-                return;
+                resolve(null); return;
             }
 
             if (useNative) {
-                // Chrome/Edge desktop & Android – native BarcodeDetector
-                const detector = new BarcodeDetector({
-                    formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code', 'data_matrix']
-                });
+                // Native BarcodeDetector (Chrome/Edge on desktop + Android)
+                let supportedFormats;
+                try { supportedFormats = await BarcodeDetector.getSupportedFormats(); }
+                catch { supportedFormats = ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code','itf']; }
+
+                const detector = new BarcodeDetector({ formats: supportedFormats });
+
                 function scan() {
                     if (!active) return;
-                    detector.detect(video).then(function (barcodes) {
+                    detector.detect(video).then(function (codes) {
                         if (!active) return;
-                        if (barcodes.length > 0) { cleanup(); resolve(barcodes[0].rawValue); }
+                        if (codes.length > 0) { cleanup(); resolve(codes[0].rawValue); }
                         else requestAnimationFrame(scan);
                     }).catch(function () { if (active) requestAnimationFrame(scan); });
                 }
                 scan();
 
             } else {
-                // ZXing canvas polling – iOS WebKit (14+) and Firefox.
-                // drawImage(video) + getImageData() works on same-origin getUserMedia streams.
-                const hints = new Map();
-                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                // ZXing fallback (iOS / Firefox)
+                const NATIVE_FORMATS = [
                     ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
                     ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-                    ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-                    ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX
-                ]);
+                    ZXing.BarcodeFormat.UPC_A,  ZXing.BarcodeFormat.UPC_E,
+                    ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX,
+                    ZXing.BarcodeFormat.ITF
+                ];
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, NATIVE_FORMATS);
+                hints.set(ZXing.DecodeHintType.TRY_HARDER, true);   // multi-direction, more attempts
+
                 const reader = new ZXing.MultiFormatReader();
                 reader.setHints(hints);
-                const canvas = document.createElement('canvas');
 
-                function pollFrame() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const DECODE_W = 640; // fixed decode width — fast enough while keeping detail
+                let lastTs = 0;
+
+                function pollFrame(now) {
                     if (!active) return;
-                    if (video.readyState >= 2 && video.videoWidth > 0) {
-                        if (canvas.width !== video.videoWidth)  canvas.width  = video.videoWidth;
-                        if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
-                        canvas.getContext('2d').drawImage(video, 0, 0);
+                    // Decode at ~15 fps to avoid blocking the main thread on mobile
+                    if (now - lastTs >= 66 && video.readyState >= 2 && video.videoWidth > 0) {
+                        lastTs = now;
+                        const aspect = video.videoHeight / video.videoWidth;
+                        const w = DECODE_W, h = Math.round(w * aspect);
+                        if (canvas.width !== w || canvas.height !== h) {
+                            canvas.width = w; canvas.height = h;
+                        }
+                        ctx.drawImage(video, 0, 0, w, h);
                         try {
                             const lum = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                             const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
@@ -189,11 +226,11 @@ window.shmantry = {
                             cleanup();
                             resolve(result.getText());
                             return;
-                        } catch { /* NotFoundException – no barcode in this frame, keep polling */ }
+                        } catch { /* NotFoundException – keep polling */ }
                     }
-                    setTimeout(pollFrame, 150);
+                    requestAnimationFrame(pollFrame);
                 }
-                pollFrame();
+                requestAnimationFrame(pollFrame);
             }
         });
     },
