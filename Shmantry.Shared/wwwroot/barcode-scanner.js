@@ -1,38 +1,53 @@
-let stream = null;
-const CAPTURE_W = 640;
-const CAPTURE_H = 480;
+let _dotNet = null;
 
-export async function startCamera(videoEl) {
-    try {
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: {
+export function initScanner(containerEl, dotNetHelper) {
+    _dotNet = dotNetHelper;
+
+    Quagga.init({
+        inputStream: {
+            type: 'LiveStream',
+            target: containerEl,
+            constraints: {
                 facingMode: { ideal: 'environment' },
-                width:  { ideal: CAPTURE_W },
-                height: { ideal: CAPTURE_H }
+                width:  { min: 640, ideal: 1280 },
+                height: { min: 480, ideal: 720 }
             }
-        });
-        videoEl.srcObject = stream;
-        await new Promise(resolve => { videoEl.onloadedmetadata = resolve; });
-        await videoEl.play();
-        return true;
-    } catch (err) {
-        console.error('Camera error:', err);
-        return false;
-    }
+        },
+        locator: {
+            patchSize: 'medium',
+            halfSample: true
+        },
+        numOfWorkers: 0,
+        frequency: 10,
+        decoder: {
+            readers: [
+                'ean_reader',
+                'ean_8_reader',
+                'code_128_reader',
+                'code_39_reader',
+                'upc_reader',
+                'upc_e_reader',
+                'codabar_reader',
+                'i2of5_reader',
+            ]
+        },
+        locate: true
+    }, err => {
+        if (err) {
+            dotNetHelper.invokeMethodAsync('OnScannerError', err.toString());
+            return;
+        }
+        Quagga.start();
+        dotNetHelper.invokeMethodAsync('OnScannerReady');
+    });
+
+    Quagga.onDetected(result => {
+        const code = result?.codeResult?.code;
+        if (code) dotNetHelper.invokeMethodAsync('OnBarcodeDetected', code);
+    });
 }
 
-export function captureFrame(videoEl, canvasEl) {
-    if (!videoEl.videoWidth || !videoEl.videoHeight) return new Uint8Array(0);
-    canvasEl.width  = CAPTURE_W;
-    canvasEl.height = CAPTURE_H;
-    const ctx = canvasEl.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(videoEl, 0, 0, CAPTURE_W, CAPTURE_H);
-    return new Uint8Array(ctx.getImageData(0, 0, CAPTURE_W, CAPTURE_H).data.buffer);
-}
-
-export function stopCamera() {
-    if (stream) {
-        stream.getTracks().forEach(t => t.stop());
-        stream = null;
-    }
+export function stopScanner() {
+    try { Quagga.stop(); } catch {}
+    _dotNet = null;
 }
