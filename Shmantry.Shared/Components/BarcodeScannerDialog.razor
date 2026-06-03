@@ -1,0 +1,24 @@
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" />
+            <MudText Typo="Typo.h6">Barcode scannen</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <BarcodeScanner OnDetected="OnDetected" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Abbrechen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private void OnDetected(string barcode) =>
+        MudDialog.Close(DialogResult.Ok(barcode));
+
+    private void Cancel() =>
+        MudDialog.Cancel();
+}

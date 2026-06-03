@@ -1,5 +1,7 @@
 @page "/"
 @inject Shmantry.Shared.Services.IAuthNavigationService AuthNav
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Shmantry</PageTitle>
 
@@ -53,3 +55,20 @@
         </MudPaper>
     </MudItem>
 </MudGrid>
+
+@* FAB — positioned above the bottom nav bar *@
+<MudFab Color="Color.Primary"
+        StartIcon="@Icons.Material.Filled.QrCodeScanner"
+        Style="position:fixed;bottom:72px;right:16px;z-index:1000;"
+        OnClick="OpenScannerAsync" />
+
+@code {
+    private async Task OpenScannerAsync()
+    {
+        var dialog = await DialogService.ShowAsync<BarcodeScannerDialog>(string.Empty,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = false });
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: string code })
+            Snackbar.Add(code, Severity.Success);
+    }
+}
