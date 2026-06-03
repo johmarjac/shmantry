@@ -4,18 +4,25 @@ using Shmantry.Shared.Services;
 
 namespace Shmantry.Web.Services;
 
+#pragma warning disable CS0618
 public class MsalAuthNavigationService : IAuthNavigationService
 {
     private readonly NavigationManager _nav;
+    private readonly SignOutSessionStateManager _signOutManager;
 
-    public MsalAuthNavigationService(NavigationManager nav) => _nav = nav;
+    public MsalAuthNavigationService(NavigationManager nav, SignOutSessionStateManager signOutManager)
+    {
+        _nav = nav;
+        _signOutManager = signOutManager;
+    }
 
     public void NavigateToLogin() =>
-        _nav.NavigateToLogin($"{_nav.BaseUri}authentication/login");
+        _nav.NavigateTo($"{_nav.BaseUri}authentication/login");
 
-    public Task NavigateToLogoutAsync()
+    public async Task NavigateToLogoutAsync()
     {
-        _nav.NavigateToLogout($"{_nav.BaseUri}authentication/logout");
-        return Task.CompletedTask;
+        await _signOutManager.SetSignOutState();
+        _nav.NavigateTo($"{_nav.BaseUri}authentication/logout");
     }
 }
+#pragma warning restore CS0618
