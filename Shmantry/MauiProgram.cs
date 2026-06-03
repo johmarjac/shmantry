@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 using Shmantry.Services;
 using Shmantry.Shared;
+using Shmantry.Shared.Services;
 
 namespace Shmantry;
 
@@ -22,6 +23,7 @@ public static class MauiProgram
         builder.Services.AddSharedServices();
         builder.Services.AddAuthorizationCore();
         builder.Services.AddScoped<AuthenticationStateProvider, AnonymousAuthStateProvider>();
+        builder.Services.AddScoped<IAuthNavigationService, AnonymousAuthNavigationService>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
