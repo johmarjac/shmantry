@@ -24,6 +24,7 @@ public static class MauiProgram
         builder.Services.AddAuthorizationCore();
         builder.Services.AddScoped<AuthenticationStateProvider, AnonymousAuthStateProvider>();
         builder.Services.AddScoped<IAuthNavigationService, AnonymousAuthNavigationService>();
+        builder.Services.AddScoped<IOneDriveService, NoOpOneDriveService>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

@@ -1,0 +1,32 @@
+@inject Shmantry.Shared.Services.IOneDriveService OneDrive
+
+<MudPaper Class="pa-4 mb-3" Elevation="0" Style="border-radius:16px;">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        @if (_loading)
+        {
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Prüfe shmantry.json…</MudText>
+        }
+        else if (_exists == true)
+        {
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+            <MudText Typo="Typo.body2">shmantry.json ist vorhanden</MudText>
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Warning" Size="Size.Small" />
+            <MudText Typo="Typo.body2">shmantry.json nicht vorhanden</MudText>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    private bool? _exists;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _exists = await OneDrive.CheckShmantryFileExistsAsync();
+        _loading = false;
+    }
+}
