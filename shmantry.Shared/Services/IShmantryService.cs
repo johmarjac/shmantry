@@ -39,5 +39,5 @@ public interface IShmantryService : IDisposable
     Task SaveSettingsAsync(AppSettings settings);
     Task<bool> TryAutoLoadAsync();
 
-    event Action<bool>? OnAutoSaved;
+    event Action<AutoSaveStatus>? OnAutoSaved;
 }

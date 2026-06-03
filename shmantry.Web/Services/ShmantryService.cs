@@ -19,7 +19,7 @@ public class ShmantryService : IShmantryService
 
     private CancellationTokenSource? _autoSaveCts;
 
-    public event Action<bool>? OnAutoSaved;
+    public event Action<AutoSaveStatus>? OnAutoSaved;
     public DateTime? LastExportedAt { get; private set; }
 
     public ShmantryService(IJSRuntime js)
@@ -93,18 +93,28 @@ public class ShmantryService : IShmantryService
         {
             var json = await ExportDataAsync();
             await _js.InvokeVoidAsync("localStorage.setItem", "shmantry_data", json);
-            bool oneDriveSaved = false;
+
+            var status = AutoSaveStatus.LocalOnly;
             try
             {
                 var isSignedIn = await _js.InvokeAsync<bool>("shmantry.oneDrive.isSignedIn");
                 if (isSignedIn)
                 {
-                    await _js.InvokeVoidAsync("shmantry.oneDrive.saveFile", json);
-                    oneDriveSaved = true;
+                    try
+                    {
+                        // saveFileSilent never opens a popup — safe to call from background tasks
+                        await _js.InvokeVoidAsync("shmantry.oneDrive.saveFileSilent", json);
+                        status = AutoSaveStatus.LocalAndOneDrive;
+                    }
+                    catch
+                    {
+                        status = AutoSaveStatus.OneDriveFailed;
+                    }
                 }
             }
-            catch { /* OneDrive save failed silently */ }
-            OnAutoSaved?.Invoke(oneDriveSaved);
+            catch { }
+
+            OnAutoSaved?.Invoke(status);
         }
         catch { /* silent */ }
     }

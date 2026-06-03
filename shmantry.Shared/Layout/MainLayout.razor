@@ -71,12 +71,17 @@
         await CheckOneDriveConflictAsync();
     }
 
-    private void HandleAutoSaved(bool includedOneDrive)
+    private void HandleAutoSaved(AutoSaveStatus status)
     {
-        var msg = includedOneDrive ? "Gespeichert (lokal + OneDrive)" : "Lokal gespeichert";
-        Snackbar.Add(msg, Severity.Success, cfg =>
+        var (msg, sev) = status switch
         {
-            cfg.VisibleStateDuration = 1500;
+            AutoSaveStatus.LocalAndOneDrive => ("Gespeichert (lokal + OneDrive)", Severity.Success),
+            AutoSaveStatus.OneDriveFailed   => ("Lokal gespeichert – OneDrive-Sync fehlgeschlagen", Severity.Warning),
+            _                               => ("Lokal gespeichert", Severity.Success)
+        };
+        Snackbar.Add(msg, sev, cfg =>
+        {
+            cfg.VisibleStateDuration = 2000;
             cfg.ShowTransitionDuration = 200;
             cfg.HideTransitionDuration = 200;
         });

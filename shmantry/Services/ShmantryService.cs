@@ -9,7 +9,7 @@ public class ShmantryService : IShmantryService
     private SQLiteAsyncConnection? _db;
     private AppSettings? _cachedSettings;
 
-    public event Action<bool>? OnAutoSaved { add { } remove { } }
+    public event Action<AutoSaveStatus>? OnAutoSaved { add { } remove { } }
     public DateTime? LastExportedAt => null;
     public Task<bool> MergeDataAsync(string json) => Task.FromResult(false);
 

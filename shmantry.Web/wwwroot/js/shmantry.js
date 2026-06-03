@@ -241,6 +241,9 @@ window.shmantry = {
             return this._app;
         },
 
+        // Interactive token: tries silent first, falls back to loginPopup.
+        // Only call from explicit user actions (button clicks) — browsers block
+        // popups that are not triggered by a user gesture.
         _token: async function () {
             const app = await this._getApp();
             const accounts = app.getAllAccounts();
@@ -252,6 +255,16 @@ window.shmantry = {
             }
             shmantry.oneDrive._clearInteractionLock();
             const r = await app.loginPopup({ scopes: this._SCOPES });
+            return r.accessToken;
+        },
+
+        // Silent-only token: never opens a popup. Throws if the token cannot be
+        // acquired silently (e.g. refresh token expired). Use for background tasks.
+        _tokenSilent: async function () {
+            const app = await this._getApp();
+            const accounts = app.getAllAccounts();
+            if (accounts.length === 0) throw new Error('not signed in');
+            const r = await app.acquireTokenSilent({ scopes: this._SCOPES, account: accounts[0] });
             return r.accessToken;
         },
 
@@ -293,8 +306,20 @@ window.shmantry = {
             return await resp.text();
         },
 
+        // Interactive save — may open loginPopup if token expired. Use for explicit user actions.
         saveFile: async function (content) {
             const token = await this._token();
+            const resp = await fetch(this._FILE, {
+                method: 'PUT',
+                headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: content
+            });
+            if (!resp.ok) throw new Error('Graph API HTTP ' + resp.status);
+        },
+
+        // Silent save — never opens a popup. Throws on auth failure. Use for auto-save.
+        saveFileSilent: async function (content) {
+            const token = await this._tokenSilent();
             const resp = await fetch(this._FILE, {
                 method: 'PUT',
                 headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
