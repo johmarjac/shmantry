@@ -86,8 +86,8 @@
             <div class="d-flex flex-column gap-2">
                 @foreach (var group in groups)
                 {
-                    var isExpanded = _expandedIds.Contains(group.FoodItemId);
-                    <div class="inv-entry" @onclick="() => ToggleExpand(group.FoodItemId)">
+                    var isExpanded = _expandedIds.Contains(group.GroupKey);
+                    <div class="inv-entry" @onclick="() => ToggleExpand(group.GroupKey)">
                         @* ── Collapsed row ── *@
                         <div class="inv-row-main">
                             @if (!string.IsNullOrEmpty(group.ImageUrl))
@@ -106,14 +106,11 @@
                                 {
                                     <div class="inv-sub">@group.Brand</div>
                                 }
-                                @{
-                                    var locs = group.Entries
-                                        .Select(e => string.IsNullOrEmpty(e.HomeName)
-                                            ? e.StorageLocationName
-                                            : $"{e.HomeName} – {e.StorageLocationName}")
-                                        .Distinct().ToList();
-                                }
-                                <div class="inv-loc">@string.Join(", ", locs)</div>
+                                <div class="inv-loc">
+                                    @(string.IsNullOrEmpty(group.HomeName)
+                                        ? group.StorageLocationName
+                                        : $"{group.HomeName} – {group.StorageLocationName}")
+                                </div>
                                 @* Expiry badges *@
                                 <div class="d-flex gap-1 mt-1 flex-wrap" style="align-items:center;">
                                     @if (group.Entries.Any(e => e.IsExpired))
@@ -183,7 +180,7 @@
                                         {
                                             <span style="font-size:12px;color:#6e6e73;">Kein MHD</span>
                                         }
-                                        <span class="inv-mhd-loc">@entry.StorageLocationName</span>
+                                        <span style="flex:1;"></span>
                                         <MudIconButton Icon="@Icons.Material.Filled.MoveUp" Size="Size.Small"
                                                        OnClick="() => TransferEntry(entry)" />
                                         <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
@@ -206,11 +203,16 @@
     private sealed class EntryGroup
     {
         public string FoodItemId { get; init; } = string.Empty;
+        public string StorageLocationId { get; init; } = string.Empty;
+        public string StorageLocationName { get; init; } = string.Empty;
+        public string HomeId { get; init; } = string.Empty;
+        public string HomeName { get; init; } = string.Empty;
         public string Name { get; init; } = string.Empty;
         public string? Brand { get; init; }
         public string? ImageUrl { get; init; }
         public List<ItemEntryWithDetails> Entries { get; init; } = [];
         public int TotalQuantity => Entries.Sum(e => e.Quantity);
+        public string GroupKey => $"{FoodItemId}|{StorageLocationId}";
     }
 
     private bool _loading = true;
@@ -237,14 +239,18 @@
         if (_filterLocationId != null) filtered = filtered.Where(e => e.StorageLocationId == _filterLocationId);
 
         var groups = filtered
-            .GroupBy(e => e.FoodItemId)
+            .GroupBy(e => (e.FoodItemId, e.StorageLocationId))
             .Select(g => new EntryGroup
             {
-                FoodItemId = g.Key,
-                Name       = g.First().Name,
-                Brand      = g.First().Brand,
-                ImageUrl   = g.First().ImageUrl,
-                Entries    = g.ToList()
+                FoodItemId          = g.Key.FoodItemId,
+                StorageLocationId   = g.Key.StorageLocationId,
+                StorageLocationName = g.First().StorageLocationName,
+                HomeId              = g.First().HomeId,
+                HomeName            = g.First().HomeName,
+                Name                = g.First().Name,
+                Brand               = g.First().Brand,
+                ImageUrl            = g.First().ImageUrl,
+                Entries             = g.ToList()
             });
 
         return _sortMode switch
@@ -270,10 +276,10 @@
     private void OnLocationFilterChanged(string? locationId) =>
         _filterLocationId = locationId;
 
-    private void ToggleExpand(string foodItemId)
+    private void ToggleExpand(string groupKey)
     {
-        if (!_expandedIds.Add(foodItemId))
-            _expandedIds.Remove(foodItemId);
+        if (!_expandedIds.Add(groupKey))
+            _expandedIds.Remove(groupKey);
     }
 
     private async Task Reload()
@@ -316,7 +322,7 @@
         {
             foreach (var e in group.Entries)
                 await ShmantryService.DeleteItemEntryAsync(e.Id);
-            _expandedIds.Remove(group.FoodItemId);
+            _expandedIds.Remove(group.GroupKey);
             Snackbar.Add($"'{group.Name}' gelöscht.", Severity.Success);
             await Reload();
         }
