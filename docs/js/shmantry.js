@@ -113,15 +113,36 @@ window.shmantry = {
 
             cancelBtn.onclick = function () { cleanup(); resolve(null); };
 
+            // Try environment-facing first (mobile), fall back to any camera (desktop)
             try {
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: { ideal: 'environment' } }
                 });
+            } catch {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                } catch (err) {
+                    cleanup();
+                    const n = err && err.name ? err.name : '';
+                    const msg =
+                        (n === 'NotReadableError' || n === 'TrackStartError')
+                            ? 'Kamera wird von einer anderen App verwendet – bitte schließen und erneut versuchen'
+                        : (n === 'NotFoundError' || n === 'DevicesNotFoundError')
+                            ? 'Keine Kamera gefunden'
+                        : (n === 'NotAllowedError' || n === 'PermissionDeniedError')
+                            ? 'Kamera-Zugriff verweigert'
+                        : 'Kamera konnte nicht geöffnet werden' + (err.message ? ': ' + err.message : '');
+                    shmantry._toast(msg);
+                    resolve(null);
+                    return;
+                }
+            }
+            try {
                 video.srcObject = stream;
                 await video.play();
             } catch {
                 cleanup();
-                shmantry._toast('Kamera-Zugriff verweigert');
+                shmantry._toast('Kamera konnte nicht gestartet werden');
                 resolve(null);
                 return;
             }
