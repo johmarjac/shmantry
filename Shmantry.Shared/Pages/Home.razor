@@ -14,7 +14,7 @@
                     <MudText Typo="Typo.caption" Color="Color.Secondary">OneDrive verbunden</MudText>
                 </MudStack>
                 <MudButton Variant="Variant.Outlined" Size="Size.Small"
-                           OnClick="@(() => Navigation.NavigateTo("/authentication/logout"))">
+                           OnClick="@(() => Navigation.NavigateTo($"{Navigation.BaseUri}authentication/logout"))">
                     Abmelden
                 </MudButton>
             </MudStack>
@@ -28,7 +28,7 @@
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Nicht verbunden</MudText>
                 </MudStack>
                 <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary"
-                           OnClick="@(() => Navigation.NavigateTo("/authentication/login"))">
+                           OnClick="@(() => Navigation.NavigateTo($"{Navigation.BaseUri}authentication/login"))">
                     Anmelden
                 </MudButton>
             </MudStack>
