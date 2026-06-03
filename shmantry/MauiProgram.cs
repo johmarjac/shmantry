@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using shmantry.Shared.Services;
 using shmantry.Services;
 using MudBlazor.Services;
+using ZXing.Net.Maui.Controls;
 
 namespace shmantry;
 
@@ -12,6 +13,7 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
+            .UseZXingNet()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

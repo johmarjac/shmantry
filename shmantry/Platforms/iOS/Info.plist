@@ -28,5 +28,7 @@
     </array>
     <key>XSAppIconAssets</key>
     <string>Assets.xcassets/appicon.appiconset</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Wird zum Scannen von Barcodes benötigt.</string>
 </dict>
 </plist>

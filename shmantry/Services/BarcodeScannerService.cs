@@ -2,14 +2,31 @@ using shmantry.Shared.Services;
 
 namespace shmantry.Services;
 
-// Placeholder — replace with ZXing.Net.Maui.Controls integration:
-// 1. Add package ZXing.Net.Maui.Controls
-// 2. Call builder.UseZXing() in MauiProgram.cs
-// 3. Create ScannerPage with CameraBarcodeReaderView
-// 4. Navigate to it and return result via TaskCompletionSource
 public class BarcodeScannerService : IBarcodeScannerService
 {
-    public bool IsSupported => false;
+    public bool IsSupported => true;
 
-    public Task<string?> ScanBarcodeAsync() => Task.FromResult<string?>(null);
+    public Task<string?> ScanBarcodeAsync()
+    {
+        var tcs = new TaskCompletionSource<string?>();
+
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            try
+            {
+                var page = new ScannerPage(tcs);
+                var root = Application.Current?.MainPage;
+                if (root != null)
+                    await root.Navigation.PushModalAsync(page, animated: true);
+                else
+                    tcs.TrySetResult(null);
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+            }
+        });
+
+        return tcs.Task;
+    }
 }
