@@ -240,10 +240,10 @@
         void Add(double qty, string color)
         {
             if (qty <= 0) return;
-            double start = current / total * 360;
+            int start = (int)Math.Round(current / total * 360);
             current += qty;
-            double end = current / total * 360;
-            parts.Add($"{color} {start:F1}deg {end:F1}deg");
+            int end = (int)Math.Round(current / total * 360);
+            parts.Add($"{color} {start}deg {end}deg");
         }
 
         Add(_freshQty, "#4caf50");
