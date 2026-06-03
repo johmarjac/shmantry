@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.JSInterop;
 using shmantry.Shared.Models;
 using shmantry.Shared.Services;
 
@@ -7,18 +8,29 @@ namespace shmantry.Web.Services;
 
 public class ShmantryService : IShmantryService
 {
+    private readonly IJSRuntime _js;
+
     private bool _initialized = false;
     private readonly List<Home> _homes = [];
     private readonly List<StorageLocation> _locations = [];
     private readonly List<FoodItem> _foodItems = [];
     private readonly List<ItemEntry> _entries = [];
+    private AppSettings _settings = new();
+
+    private CancellationTokenSource? _autoSaveCts;
+
+    public ShmantryService(IJSRuntime js)
+    {
+        _js = js;
+    }
 
     public bool IsAppInitialized() => _initialized;
 
-    public Task<bool> CreateDatabaseAsync()
+    public async Task<bool> CreateDatabaseAsync()
     {
         _initialized = true;
-        return Task.FromResult(true);
+        await AutoSaveAsync();
+        return true;
     }
 
     public Task<bool> OpenDatabaseAsync()
@@ -34,6 +46,55 @@ public class ShmantryService : IShmantryService
         _locations.Clear();
         _foodItems.Clear();
         _entries.Clear();
+        _settings = new AppSettings();
+        _ = _js.InvokeVoidAsync("localStorage.removeItem", "shmantry_data");
+    }
+
+    // --- Settings ---
+
+    public Task<AppSettings> GetSettingsAsync() => Task.FromResult(_settings);
+
+    public Task SaveSettingsAsync(AppSettings settings)
+    {
+        _settings = settings;
+        ScheduleAutoSave();
+        return Task.CompletedTask;
+    }
+
+    // --- Auto-load / Auto-save ---
+
+    public async Task<bool> TryAutoLoadAsync()
+    {
+        try
+        {
+            var json = await _js.InvokeAsync<string?>("localStorage.getItem", "shmantry_data");
+            if (string.IsNullOrEmpty(json)) return false;
+            return await ImportDataAsync(json);
+        }
+        catch { return false; }
+    }
+
+    private void ScheduleAutoSave()
+    {
+        _autoSaveCts?.Cancel();
+        _autoSaveCts = new CancellationTokenSource();
+        var token = _autoSaveCts.Token;
+        _ = Task.Delay(600, token).ContinueWith(
+            async t => { if (!t.IsCanceled) await AutoSaveAsync(); },
+            TaskScheduler.Current);
+    }
+
+    private async Task AutoSaveAsync()
+    {
+        try
+        {
+            var json = await ExportDataAsync();
+            await _js.InvokeVoidAsync("localStorage.setItem", "shmantry_data", json);
+            var isSignedIn = await _js.InvokeAsync<bool>("shmantry.oneDrive.isSignedIn");
+            if (isSignedIn)
+                _ = _js.InvokeVoidAsync("shmantry.oneDrive.saveFile", json);
+        }
+        catch { /* silent */ }
     }
 
     // --- Homes ---
@@ -45,6 +106,7 @@ public class ShmantryService : IShmantryService
     {
         var home = new Home { Name = name, Description = description };
         _homes.Add(home);
+        ScheduleAutoSave();
         return Task.FromResult(home);
     }
 
@@ -52,6 +114,7 @@ public class ShmantryService : IShmantryService
     {
         var i = _homes.FindIndex(h => h.Id == home.Id);
         if (i >= 0) _homes[i] = home;
+        ScheduleAutoSave();
         return Task.CompletedTask;
     }
 
@@ -61,6 +124,7 @@ public class ShmantryService : IShmantryService
         _entries.RemoveAll(e => locationIds.Contains(e.StorageLocationId));
         _locations.RemoveAll(l => l.HomeId == homeId);
         _homes.RemoveAll(h => h.Id == homeId);
+        ScheduleAutoSave();
         return Task.CompletedTask;
     }
 
@@ -73,6 +137,7 @@ public class ShmantryService : IShmantryService
     {
         var loc = new StorageLocation { HomeId = homeId, Name = name, Description = description };
         _locations.Add(loc);
+        ScheduleAutoSave();
         return Task.FromResult(loc);
     }
 
@@ -80,6 +145,7 @@ public class ShmantryService : IShmantryService
     {
         var i = _locations.FindIndex(l => l.Id == location.Id);
         if (i >= 0) _locations[i] = location;
+        ScheduleAutoSave();
         return Task.CompletedTask;
     }
 
@@ -87,6 +153,7 @@ public class ShmantryService : IShmantryService
     {
         _entries.RemoveAll(e => e.StorageLocationId == locationId);
         _locations.RemoveAll(l => l.Id == locationId);
+        ScheduleAutoSave();
         return Task.CompletedTask;
     }
 
@@ -105,29 +172,23 @@ public class ShmantryService : IShmantryService
 
     // --- Item Entries ---
 
-
     public Task<List<ItemEntryWithDetails>> GetItemEntriesAsync(string storageLocationId)
     {
         var result = _entries
             .Where(e => e.StorageLocationId == storageLocationId)
-            .Select(e => Enrich(e))
+            .Select(Enrich)
             .ToList();
         return Task.FromResult(result);
     }
 
     public Task<List<ItemEntryWithDetails>> GetAllItemEntriesAsync() =>
-        Task.FromResult(_entries.Select(e => Enrich(e)).ToList());
+        Task.FromResult(_entries.Select(Enrich).ToList());
 
     public Task<List<ItemEntryWithDetails>> SearchByBarcodeAsync(string barcode)
     {
         var food = _foodItems.FirstOrDefault(f => f.Barcode == barcode);
         if (food == null) return Task.FromResult(new List<ItemEntryWithDetails>());
-
-        var result = _entries
-            .Where(e => e.FoodItemId == food.Id)
-            .Select(e => Enrich(e))
-            .ToList();
-        return Task.FromResult(result);
+        return Task.FromResult(_entries.Where(e => e.FoodItemId == food.Id).Select(Enrich).ToList());
     }
 
     public Task<ItemEntry> AddItemEntryAsync(string storageLocationId, string foodItemId, int quantity,
@@ -141,6 +202,7 @@ public class ShmantryService : IShmantryService
         if (existing != null)
         {
             existing.Quantity += quantity;
+            ScheduleAutoSave();
             return Task.FromResult(existing);
         }
 
@@ -153,6 +215,7 @@ public class ShmantryService : IShmantryService
             Notes = notes
         };
         _entries.Add(entry);
+        ScheduleAutoSave();
         return Task.FromResult(entry);
     }
 
@@ -160,12 +223,14 @@ public class ShmantryService : IShmantryService
     {
         var i = _entries.FindIndex(e => e.Id == entry.Id);
         if (i >= 0) _entries[i] = entry;
+        ScheduleAutoSave();
         return Task.CompletedTask;
     }
 
     public Task DeleteItemEntryAsync(string entryId)
     {
         _entries.RemoveAll(e => e.Id == entryId);
+        ScheduleAutoSave();
         return Task.CompletedTask;
     }
 
@@ -207,6 +272,7 @@ public class ShmantryService : IShmantryService
                     Notes = entry.Notes
                 });
         }
+        ScheduleAutoSave();
         return Task.CompletedTask;
     }
 
@@ -235,7 +301,8 @@ public class ShmantryService : IShmantryService
             Quantity = e.Quantity,
             BestBeforeDate = e.BestBeforeDate,
             Notes = e.Notes,
-            CreatedAt = e.CreatedAt
+            CreatedAt = e.CreatedAt,
+            ExpiryWarningDays = _settings.ExpiryWarningDays
         };
     }
 
@@ -245,11 +312,15 @@ public class ShmantryService : IShmantryService
         List<Home> Homes,
         List<StorageLocation> Locations,
         List<FoodItem> FoodItems,
-        List<ItemEntry> Entries);
+        List<ItemEntry> Entries,
+        AppSettings? Settings = null);
 
     public Task<string> ExportDataAsync()
     {
-        var data = new ExportData(_homes.ToList(), _locations.ToList(), _foodItems.ToList(), _entries.ToList());
+        var data = new ExportData(
+            _homes.ToList(), _locations.ToList(),
+            _foodItems.ToList(), _entries.ToList(),
+            _settings);
         return Task.FromResult(JsonSerializer.Serialize(data, _json));
     }
 
@@ -263,6 +334,7 @@ public class ShmantryService : IShmantryService
             _locations.Clear(); _locations.AddRange(data.Locations);
             _foodItems.Clear(); _foodItems.AddRange(data.FoodItems);
             _entries.Clear(); _entries.AddRange(data.Entries);
+            _settings = data.Settings ?? new AppSettings();
             _initialized = true;
             return Task.FromResult(true);
         }

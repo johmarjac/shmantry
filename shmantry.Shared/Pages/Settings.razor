@@ -11,6 +11,27 @@
 <MudContainer Class="pa-4 pb-20">
     <MudText Typo="Typo.h5" Class="mb-5" Style="font-weight:700;">Einstellungen</MudText>
 
+    @* ── General preferences ───────────────────────────────────────────────── *@
+    <MudPaper Class="pa-4 mb-3" Elevation="0" Style="background:#1c1c1e;border-radius:16px;">
+        <div class="d-flex align-center gap-2 mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.Tune" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Allgemein</MudText>
+        </div>
+        <MudText Typo="Typo.body2" Class="mb-3" Style="color:#9e9e9e;">
+            Artikel werden als „läuft bald ab" markiert, wenn ihr MHD innerhalb der
+            angegebenen Anzahl von Tagen liegt.
+        </MudText>
+        <div class="d-flex align-end gap-3">
+            <MudNumericField @bind-Value="_expiryDays" Label="Ablaufwarnung (Tage)"
+                             Variant="Variant.Outlined" Min="1" Max="365"
+                             Style="max-width:200px;" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="SaveSettings" Disabled="@_busy">
+                Speichern
+            </MudButton>
+        </div>
+    </MudPaper>
+
     @if (FormFactor.GetFormFactor() == "Web")
     {
         @* ── OneDrive ──────────────────────────────────────────────────────── *@
@@ -118,6 +139,13 @@
     private bool _busy;
     private bool _odSignedIn;
     private string? _accountName;
+    private int _expiryDays = 7;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var settings = await ShmantryService.GetSettingsAsync();
+        _expiryDays = settings.ExpiryWarningDays;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -127,6 +155,14 @@
             _accountName = await JS.InvokeAsync<string?>("shmantry.oneDrive.getAccountName");
         _jsReady = true;
         StateHasChanged();
+    }
+
+    private async Task SaveSettings()
+    {
+        _busy = true;
+        await ShmantryService.SaveSettingsAsync(new AppSettings { ExpiryWarningDays = _expiryDays });
+        Snackbar.Add("Einstellungen gespeichert.", Severity.Success);
+        _busy = false;
     }
 
     private async Task SignIn()

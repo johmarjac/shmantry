@@ -17,10 +17,11 @@ public class ItemEntryWithDetails
     public DateTime? BestBeforeDate { get; set; }
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int ExpiryWarningDays { get; set; } = 7;
 
     public bool IsExpiringSoon =>
-        BestBeforeDate.HasValue && BestBeforeDate.Value <= DateTime.UtcNow.AddDays(7);
+        BestBeforeDate.HasValue && BestBeforeDate.Value.Date <= DateTime.Today.AddDays(ExpiryWarningDays);
 
     public bool IsExpired =>
-        BestBeforeDate.HasValue && BestBeforeDate.Value < DateTime.UtcNow;
+        BestBeforeDate.HasValue && BestBeforeDate.Value.Date < DateTime.Today;
 }
