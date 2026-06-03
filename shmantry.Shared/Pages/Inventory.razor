@@ -168,19 +168,21 @@
                                 @foreach (var entry in group.Entries.OrderBy(e => e.BestBeforeDate ?? DateTime.MaxValue))
                                 {
                                     <div class="inv-mhd-row">
-                                        <span class="inv-mhd-qty">@entry.Quantity ×</span>
-                                        @if (entry.BestBeforeDate.HasValue)
-                                        {
-                                            <MudChip T="string" Size="Size.Small" Label="true" Style="height:24px;font-size:12px;margin:0;"
-                                                     Color="@(entry.IsExpired ? Color.Error : entry.IsExpiringSoon ? Color.Warning : Color.Default)">
-                                                MHD @entry.BestBeforeDate.Value.ToString("dd.MM.yyyy")
-                                            </MudChip>
-                                        }
-                                        else
-                                        {
-                                            <span style="font-size:12px;color:#6e6e73;">Kein MHD</span>
-                                        }
-                                        <span style="flex:1;"></span>
+                                        <div style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;min-width:0;"
+                                             @onclick="() => OpenEditDialog(entry)">
+                                            <span class="inv-mhd-qty">@entry.Quantity ×</span>
+                                            @if (entry.BestBeforeDate.HasValue)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Label="true" Style="height:24px;font-size:12px;margin:0;"
+                                                         Color="@(entry.IsExpired ? Color.Error : entry.IsExpiringSoon ? Color.Warning : Color.Default)">
+                                                    MHD @entry.BestBeforeDate.Value.ToString("dd.MM.yyyy")
+                                                </MudChip>
+                                            }
+                                            else
+                                            {
+                                                <span style="font-size:12px;color:#6e6e73;">Kein MHD</span>
+                                            }
+                                        </div>
                                         <MudIconButton Icon="@Icons.Material.Filled.MoveUp" Size="Size.Small"
                                                        OnClick="() => TransferEntry(entry)" />
                                         <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
@@ -317,6 +319,13 @@
             { x => x.StorageLocationId, first.StorageLocationId }
         };
         var d = await DialogService.ShowAsync<QuickAddDialog>("Hinzufügen", p);
+        if (!(await d.Result).Canceled) await Reload();
+    }
+
+    private async Task OpenEditDialog(ItemEntryWithDetails entry)
+    {
+        var p = new DialogParameters<EditEntryDialog> { { x => x.Entry, entry } };
+        var d = await DialogService.ShowAsync<EditEntryDialog>("Eintrag bearbeiten", p);
         if (!(await d.Result).Canceled) await Reload();
     }
 

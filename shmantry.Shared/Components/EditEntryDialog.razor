@@ -1,0 +1,61 @@
+@inject IShmantryService ShmantryService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
+            Eintrag bearbeiten
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            @Entry.Name
+            @if (!string.IsNullOrEmpty(Entry.StorageLocationName))
+            {
+                <span> · @Entry.HomeName – @Entry.StorageLocationName</span>
+            }
+        </MudText>
+        <MudNumericField @bind-Value="_quantity" Label="Anzahl" Min="1"
+                         Variant="Variant.Outlined" FullWidth="true" Class="mb-3" />
+        <MudDatePicker @bind-Date="_bestBefore" Label="MHD (optional)"
+                       Variant="Variant.Outlined" Clearable="true"
+                       DateFormat="dd.MM.yyyy" Class="w-100" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Abbrechen</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Save" Disabled="@(_quantity < 1)">
+            Speichern
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ItemEntryWithDetails Entry { get; set; } = default!;
+
+    private int _quantity;
+    private DateTime? _bestBefore;
+
+    protected override void OnInitialized()
+    {
+        _quantity   = Entry.Quantity;
+        _bestBefore = Entry.BestBeforeDate;
+    }
+
+    private async Task Save()
+    {
+        await ShmantryService.UpdateItemEntryAsync(new ItemEntry
+        {
+            Id                = Entry.Id,
+            FoodItemId        = Entry.FoodItemId,
+            StorageLocationId = Entry.StorageLocationId,
+            Quantity          = _quantity,
+            BestBeforeDate    = _bestBefore,
+            Notes             = Entry.Notes
+        });
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

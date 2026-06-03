@@ -9,7 +9,6 @@
 <style>
     .art-card   { background: #1c1c1e; border-radius: 14px; overflow: hidden; }
     .art-row    { display: flex; align-items: center; gap: 10px; padding: 12px; }
-    .art-edit   { background: #242426; padding: 12px; border-top: 1px solid #2c2c2e; }
     .art-loc    { font-size: 12px; color: #9e9e9e; margin-bottom: 4px; }
 </style>
 
@@ -82,11 +81,8 @@
                 @foreach (var entry in _entries.OrderBy(e => e.BestBeforeDate ?? DateTime.MaxValue))
                 {
                     <div class="art-card">
-                        @if (_editingId != entry.Id)
-                        {
-                            @* ── Normal row ── *@
-                            <div class="art-row">
-                                <div style="flex:1;min-width:0;">
+                        <div class="art-row">
+                                <div style="flex:1;min-width:0;cursor:pointer;" @onclick="() => OpenEditDialog(entry)">
                                     <div class="art-loc">@entry.HomeName – @entry.StorageLocationName</div>
                                     <div class="d-flex align-center gap-2 flex-wrap">
                                         <span style="font-size:16px;font-weight:700;color:#f0f0f0;">
@@ -109,41 +105,11 @@
                                         <div style="font-size:12px;color:#9e9e9e;margin-top:3px;">@entry.Notes</div>
                                     }
                                 </div>
-                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
-                                               OnClick="() => StartEdit(entry)" />
                                 <MudIconButton Icon="@Icons.Material.Filled.MoveUp" Size="Size.Small"
                                                OnClick="() => TransferEntry(entry)" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                                Color="Color.Error" OnClick="() => DeleteEntry(entry)" />
                             </div>
-                        }
-                        else
-                        {
-                            @* ── Inline edit form ── *@
-                            <div class="art-row" style="padding-bottom:4px;">
-                                <div class="art-loc" style="margin:0;">
-                                    @entry.HomeName – @entry.StorageLocationName
-                                </div>
-                            </div>
-                            <div class="art-edit">
-                                <div class="d-flex gap-3 align-end flex-wrap">
-                                    <MudNumericField @bind-Value="_editQty" Label="Anzahl"
-                                                     Variant="Variant.Outlined" Min="1"
-                                                     Style="max-width:110px;" Dense="true" />
-                                    <MudDatePicker @bind-Date="_editBestBefore"
-                                                   Label="MHD (optional)"
-                                                   Variant="Variant.Outlined" Clearable="true"
-                                                   DateFormat="dd.MM.yyyy" Style="max-width:190px;" />
-                                    <div class="d-flex gap-1">
-                                        <MudIconButton Icon="@Icons.Material.Filled.Check"
-                                                       Color="Color.Primary" Size="Size.Medium"
-                                                       OnClick="() => SaveEdit(entry)" />
-                                        <MudIconButton Icon="@Icons.Material.Filled.Close"
-                                                       Size="Size.Medium" OnClick="CancelEdit" />
-                                    </div>
-                                </div>
-                            </div>
-                        }
                     </div>
                 }
             </div>
@@ -166,10 +132,6 @@
     private string? _nutriScore;
     private string? _barcode;
 
-    private string? _editingId;
-    private int     _editQty;
-    private DateTime? _editBestBefore;
-
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
@@ -189,28 +151,11 @@
         _loading = false;
     }
 
-    private void StartEdit(ItemEntryWithDetails entry)
+    private async Task OpenEditDialog(ItemEntryWithDetails entry)
     {
-        _editingId      = entry.Id;
-        _editQty        = entry.Quantity;
-        _editBestBefore = entry.BestBeforeDate;
-    }
-
-    private void CancelEdit() => _editingId = null;
-
-    private async Task SaveEdit(ItemEntryWithDetails entry)
-    {
-        await ShmantryService.UpdateItemEntryAsync(new ItemEntry
-        {
-            Id                = entry.Id,
-            FoodItemId        = entry.FoodItemId,
-            StorageLocationId = entry.StorageLocationId,
-            Quantity          = _editQty,
-            BestBeforeDate    = _editBestBefore,
-            Notes             = entry.Notes
-        });
-        _editingId = null;
-        await LoadAsync();
+        var p = new DialogParameters<EditEntryDialog> { { x => x.Entry, entry } };
+        var d = await DialogService.ShowAsync<EditEntryDialog>("Eintrag bearbeiten", p);
+        if (!(await d.Result).Canceled) await LoadAsync();
     }
 
     private async Task DeleteEntry(ItemEntryWithDetails entry)
