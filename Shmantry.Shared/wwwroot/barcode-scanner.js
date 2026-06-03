@@ -9,26 +9,20 @@ export function initScanner(containerEl, dotNetHelper) {
             target: containerEl,
             constraints: {
                 facingMode: { ideal: 'environment' },
-                width:  { min: 640, ideal: 1280 },
-                height: { min: 480, ideal: 720 }
+                width:  { ideal: 1280 },
+                height: { ideal: 720 }
             }
         },
         locator: {
             patchSize: 'medium',
             halfSample: true
         },
-        numOfWorkers: 0,
+        numOfWorkers: 4,
         frequency: 10,
         decoder: {
             readers: [
                 'ean_reader',
                 'ean_8_reader',
-                'code_128_reader',
-                'code_39_reader',
-                'upc_reader',
-                'upc_e_reader',
-                'codabar_reader',
-                'i2of5_reader',
             ]
         },
         locate: true
