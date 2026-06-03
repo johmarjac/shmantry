@@ -1,5 +1,6 @@
 @page "/inventory"
 @inject IShmantryService ShmantryService
+@inject NavigationManager Navigation
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -147,14 +148,14 @@
                             <div class="inv-expand" @onclick:stopPropagation="true">
                                 @* Action buttons *@
                                 <div class="inv-actions">
-                                    <MudTooltip Text="Bearbeiten">
+                                    <MudTooltip Text="Detailseite">
                                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
-                                                       OnClick="() => EditEntry(group.Entries.First())" />
+                                                       OnClick="() => EditEntry(group)" />
                                     </MudTooltip>
                                     <MudTooltip Text="Hinzufügen">
                                         <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
                                                        Color="Color.Primary"
-                                                       OnClick="() => AddEntry(group.Entries.First())" />
+                                                       OnClick="() => AddEntry(group)" />
                                     </MudTooltip>
                                     <MudTooltip Text="Umlagern">
                                         <MudIconButton Icon="@Icons.Material.Filled.MoveUp" Size="Size.Small"
@@ -282,31 +283,19 @@
             _filteredLocations = await ShmantryService.GetStorageLocationsAsync(_filterHomeId);
     }
 
-    private async Task EditEntry(ItemEntryWithDetails entry)
-    {
-        var itemEntry = new ItemEntry
-        {
-            Id = entry.Id, FoodItemId = entry.FoodItemId,
-            StorageLocationId = entry.StorageLocationId,
-            Quantity = entry.Quantity, BestBeforeDate = entry.BestBeforeDate, Notes = entry.Notes
-        };
-        var p = new DialogParameters<AddItemDialog>
-        {
-            { x => x.StorageLocationId, entry.StorageLocationId },
-            { x => x.ExistingEntry, itemEntry },
-            { x => x.FoodItemName, entry.Name }
-        };
-        var d = await DialogService.ShowAsync<AddItemDialog>("Artikel bearbeiten", p);
-        if (!(await d.Result).Canceled) await Reload();
-    }
+    private void EditEntry(EntryGroup group) =>
+        Navigation.NavigateTo($"inventory/article/{group.FoodItemId}");
 
-    private async Task AddEntry(ItemEntryWithDetails entry)
+    private async Task AddEntry(EntryGroup group)
     {
-        var p = new DialogParameters<AddItemDialog>
+        var first = group.Entries.First();
+        var p = new DialogParameters<QuickAddDialog>
         {
-            { x => x.StorageLocationId, entry.StorageLocationId }
+            { x => x.FoodItemId,        group.FoodItemId },
+            { x => x.FoodItemName,      group.Name },
+            { x => x.StorageLocationId, first.StorageLocationId }
         };
-        var d = await DialogService.ShowAsync<AddItemDialog>("Artikel hinzufügen", p);
+        var d = await DialogService.ShowAsync<QuickAddDialog>("Hinzufügen", p);
         if (!(await d.Result).Canceled) await Reload();
     }
 
