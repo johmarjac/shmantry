@@ -9,6 +9,10 @@ public class ShmantryService : IShmantryService
     private SQLiteAsyncConnection? _db;
     private AppSettings? _cachedSettings;
 
+    public event Action<bool>? OnAutoSaved { add { } remove { } }
+    public DateTime? LastExportedAt => null;
+    public Task<bool> MergeDataAsync(string json) => Task.FromResult(false);
+
     public bool IsAppInitialized()
     {
         if (_db != null) return true;
@@ -360,12 +364,15 @@ public class ShmantryService : IShmantryService
     public async Task<string> ExportDataAsync()
     {
         await EnsureDbAsync();
-        var homes = await _db!.Table<Home>().ToListAsync();
-        var locations = await _db!.Table<StorageLocation>().ToListAsync();
-        var foodItems = await _db!.Table<FoodItem>().ToListAsync();
-        var entries = await _db!.Table<ItemEntry>().ToListAsync();
-        var settings = await GetSettingsAsync();
-        var data = new { Homes = homes, Locations = locations, FoodItems = foodItems, Entries = entries, Settings = settings };
+        var data = new ExportData
+        {
+            Homes       = await _db!.Table<Home>().ToListAsync(),
+            Locations   = await _db!.Table<StorageLocation>().ToListAsync(),
+            FoodItems   = await _db!.Table<FoodItem>().ToListAsync(),
+            Entries     = await _db!.Table<ItemEntry>().ToListAsync(),
+            Settings    = await GetSettingsAsync(),
+            ExportedAt  = DateTime.UtcNow
+        };
         return System.Text.Json.JsonSerializer.Serialize(data, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
     }
 

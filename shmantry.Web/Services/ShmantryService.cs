@@ -19,6 +19,9 @@ public class ShmantryService : IShmantryService
 
     private CancellationTokenSource? _autoSaveCts;
 
+    public event Action<bool>? OnAutoSaved;
+    public DateTime? LastExportedAt { get; private set; }
+
     public ShmantryService(IJSRuntime js)
     {
         _js = js;
@@ -90,9 +93,18 @@ public class ShmantryService : IShmantryService
         {
             var json = await ExportDataAsync();
             await _js.InvokeVoidAsync("localStorage.setItem", "shmantry_data", json);
-            var isSignedIn = await _js.InvokeAsync<bool>("shmantry.oneDrive.isSignedIn");
-            if (isSignedIn)
-                _ = _js.InvokeVoidAsync("shmantry.oneDrive.saveFile", json);
+            bool oneDriveSaved = false;
+            try
+            {
+                var isSignedIn = await _js.InvokeAsync<bool>("shmantry.oneDrive.isSignedIn");
+                if (isSignedIn)
+                {
+                    await _js.InvokeVoidAsync("shmantry.oneDrive.saveFile", json);
+                    oneDriveSaved = true;
+                }
+            }
+            catch { /* OneDrive save failed silently */ }
+            OnAutoSaved?.Invoke(oneDriveSaved);
         }
         catch { /* silent */ }
     }
@@ -308,19 +320,18 @@ public class ShmantryService : IShmantryService
 
     private static readonly JsonSerializerOptions _json = new() { WriteIndented = true };
 
-    private record ExportData(
-        List<Home> Homes,
-        List<StorageLocation> Locations,
-        List<FoodItem> FoodItems,
-        List<ItemEntry> Entries,
-        AppSettings? Settings = null);
-
     public Task<string> ExportDataAsync()
     {
-        var data = new ExportData(
-            _homes.ToList(), _locations.ToList(),
-            _foodItems.ToList(), _entries.ToList(),
-            _settings);
+        LastExportedAt = DateTime.UtcNow;
+        var data = new ExportData
+        {
+            Homes       = _homes.ToList(),
+            Locations   = _locations.ToList(),
+            FoodItems   = _foodItems.ToList(),
+            Entries     = _entries.ToList(),
+            Settings    = _settings,
+            ExportedAt  = LastExportedAt
+        };
         return Task.FromResult(JsonSerializer.Serialize(data, _json));
     }
 
@@ -330,12 +341,35 @@ public class ShmantryService : IShmantryService
         {
             var data = JsonSerializer.Deserialize<ExportData>(json, _json);
             if (data == null) return Task.FromResult(false);
-            _homes.Clear(); _homes.AddRange(data.Homes);
+            _homes.Clear();     _homes.AddRange(data.Homes);
             _locations.Clear(); _locations.AddRange(data.Locations);
             _foodItems.Clear(); _foodItems.AddRange(data.FoodItems);
-            _entries.Clear(); _entries.AddRange(data.Entries);
-            _settings = data.Settings ?? new AppSettings();
-            _initialized = true;
+            _entries.Clear();   _entries.AddRange(data.Entries);
+            _settings       = data.Settings ?? new AppSettings();
+            LastExportedAt  = data.ExportedAt;
+            _initialized    = true;
+            return Task.FromResult(true);
+        }
+        catch { return Task.FromResult(false); }
+    }
+
+    public Task<bool> MergeDataAsync(string json)
+    {
+        try
+        {
+            var incoming = JsonSerializer.Deserialize<ExportData>(json, _json);
+            if (incoming == null) return Task.FromResult(false);
+
+            foreach (var h in incoming.Homes)
+                if (!_homes.Any(x => x.Id == h.Id)) _homes.Add(h);
+            foreach (var l in incoming.Locations)
+                if (!_locations.Any(x => x.Id == l.Id)) _locations.Add(l);
+            foreach (var f in incoming.FoodItems)
+                if (!_foodItems.Any(x => x.Id == f.Id)) _foodItems.Add(f);
+            foreach (var e in incoming.Entries)
+                if (!_entries.Any(x => x.Id == e.Id)) _entries.Add(e);
+
+            ScheduleAutoSave();
             return Task.FromResult(true);
         }
         catch { return Task.FromResult(false); }
