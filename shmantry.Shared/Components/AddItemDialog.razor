@@ -104,6 +104,7 @@
     [Parameter] public ItemEntry? ExistingEntry { get; set; }
     [Parameter] public string? FoodItemName { get; set; }
     [Parameter] public FoodItem? FoodItem { get; set; }
+    [Parameter] public string? InitialBarcode { get; set; }
 
     private string _barcode = string.Empty;
     private bool _looking;
@@ -130,6 +131,12 @@
         }
 
         if (FoodItem != null) _showForm = true;
+
+        if (!string.IsNullOrEmpty(InitialBarcode) && ExistingEntry == null && FoodItem == null)
+        {
+            _barcode = InitialBarcode;
+            await LookupBarcode();
+        }
 
         if (StorageLocationId == null)
         {
