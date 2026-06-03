@@ -208,6 +208,18 @@ public class ShmantryService : IShmantryService
         DateTime? bestBeforeDate = null, string? notes = null)
     {
         await EnsureDbAsync();
+        var candidates = await _db!.Table<ItemEntry>()
+            .Where(e => e.StorageLocationId == storageLocationId && e.FoodItemId == foodItemId)
+            .ToListAsync();
+        var existing = candidates.FirstOrDefault(e => SameMhd(e.BestBeforeDate, bestBeforeDate));
+
+        if (existing != null)
+        {
+            existing.Quantity += quantity;
+            await _db!.UpdateAsync(existing);
+            return existing;
+        }
+
         var entry = new ItemEntry
         {
             StorageLocationId = storageLocationId,
@@ -238,27 +250,52 @@ public class ShmantryService : IShmantryService
         var entry = await _db!.FindAsync<ItemEntry>(entryId);
         if (entry == null) return;
 
+        var candidates = await _db!.Table<ItemEntry>()
+            .Where(e => e.StorageLocationId == targetStorageLocationId && e.FoodItemId == entry.FoodItemId)
+            .ToListAsync();
+        var target = candidates.FirstOrDefault(e => e.Id != entryId && SameMhd(e.BestBeforeDate, entry.BestBeforeDate));
+
         if (quantity >= entry.Quantity)
         {
-            entry.StorageLocationId = targetStorageLocationId;
-            await _db!.UpdateAsync(entry);
+            if (target != null)
+            {
+                target.Quantity += entry.Quantity;
+                await _db!.UpdateAsync(target);
+                await _db!.DeleteAsync<ItemEntry>(entry.Id);
+            }
+            else
+            {
+                entry.StorageLocationId = targetStorageLocationId;
+                await _db!.UpdateAsync(entry);
+            }
         }
         else
         {
             entry.Quantity -= quantity;
             await _db!.UpdateAsync(entry);
 
-            var split = new ItemEntry
+            if (target != null)
             {
-                FoodItemId = entry.FoodItemId,
-                StorageLocationId = targetStorageLocationId,
-                Quantity = quantity,
-                BestBeforeDate = entry.BestBeforeDate,
-                Notes = entry.Notes
-            };
-            await _db!.InsertAsync(split);
+                target.Quantity += quantity;
+                await _db!.UpdateAsync(target);
+            }
+            else
+            {
+                var split = new ItemEntry
+                {
+                    FoodItemId = entry.FoodItemId,
+                    StorageLocationId = targetStorageLocationId,
+                    Quantity = quantity,
+                    BestBeforeDate = entry.BestBeforeDate,
+                    Notes = entry.Notes
+                };
+                await _db!.InsertAsync(split);
+            }
         }
     }
+
+    private static bool SameMhd(DateTime? a, DateTime? b) =>
+        a.HasValue == b.HasValue && (!a.HasValue || a.Value.Date == b.Value.Date);
 
     private async Task<List<ItemEntryWithDetails>> EnrichAsync(List<ItemEntry> entries)
     {

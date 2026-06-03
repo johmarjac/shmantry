@@ -133,6 +133,17 @@ public class ShmantryService : IShmantryService
     public Task<ItemEntry> AddItemEntryAsync(string storageLocationId, string foodItemId, int quantity,
         DateTime? bestBeforeDate = null, string? notes = null)
     {
+        var existing = _entries.FirstOrDefault(e =>
+            e.StorageLocationId == storageLocationId &&
+            e.FoodItemId == foodItemId &&
+            SameMhd(e.BestBeforeDate, bestBeforeDate));
+
+        if (existing != null)
+        {
+            existing.Quantity += quantity;
+            return Task.FromResult(existing);
+        }
+
         var entry = new ItemEntry
         {
             StorageLocationId = storageLocationId,
@@ -163,24 +174,44 @@ public class ShmantryService : IShmantryService
         var entry = _entries.FirstOrDefault(e => e.Id == entryId);
         if (entry == null) return Task.CompletedTask;
 
+        var target = _entries.FirstOrDefault(e =>
+            e.Id != entryId &&
+            e.StorageLocationId == targetStorageLocationId &&
+            e.FoodItemId == entry.FoodItemId &&
+            SameMhd(e.BestBeforeDate, entry.BestBeforeDate));
+
         if (quantity >= entry.Quantity)
         {
-            entry.StorageLocationId = targetStorageLocationId;
+            if (target != null)
+            {
+                target.Quantity += entry.Quantity;
+                _entries.Remove(entry);
+            }
+            else
+            {
+                entry.StorageLocationId = targetStorageLocationId;
+            }
         }
         else
         {
             entry.Quantity -= quantity;
-            _entries.Add(new ItemEntry
-            {
-                FoodItemId = entry.FoodItemId,
-                StorageLocationId = targetStorageLocationId,
-                Quantity = quantity,
-                BestBeforeDate = entry.BestBeforeDate,
-                Notes = entry.Notes
-            });
+            if (target != null)
+                target.Quantity += quantity;
+            else
+                _entries.Add(new ItemEntry
+                {
+                    FoodItemId = entry.FoodItemId,
+                    StorageLocationId = targetStorageLocationId,
+                    Quantity = quantity,
+                    BestBeforeDate = entry.BestBeforeDate,
+                    Notes = entry.Notes
+                });
         }
         return Task.CompletedTask;
     }
+
+    private static bool SameMhd(DateTime? a, DateTime? b) =>
+        a.HasValue == b.HasValue && (!a.HasValue || a.Value.Date == b.Value.Date);
 
     private ItemEntryWithDetails Enrich(ItemEntry e)
     {
