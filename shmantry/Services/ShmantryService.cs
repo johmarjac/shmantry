@@ -7,6 +7,7 @@ namespace shmantry.Services;
 public class ShmantryService : IShmantryService
 {
     private SQLiteAsyncConnection? _db;
+    private AppSettings? _cachedSettings;
 
     public bool IsAppInitialized()
     {
@@ -58,7 +59,33 @@ public class ShmantryService : IShmantryService
     {
         _db?.CloseAsync();
         _db = null;
+        _cachedSettings = null;
         Preferences.Default.Remove("db_file");
+    }
+
+    public async Task<bool> TryAutoLoadAsync()
+    {
+        if (_db != null) return true;
+        var path = Preferences.Default.Get("db_file", string.Empty);
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+        try { await InitDatabaseAsync(path); return true; }
+        catch { return false; }
+    }
+
+    public Task<AppSettings> GetSettingsAsync()
+    {
+        _cachedSettings ??= new AppSettings
+        {
+            ExpiryWarningDays = Preferences.Default.Get("expiry_warning_days", 7)
+        };
+        return Task.FromResult(_cachedSettings);
+    }
+
+    public Task SaveSettingsAsync(AppSettings settings)
+    {
+        _cachedSettings = settings;
+        Preferences.Default.Set("expiry_warning_days", settings.ExpiryWarningDays);
+        return Task.CompletedTask;
     }
 
     private async Task EnsureDbAsync()
@@ -299,6 +326,7 @@ public class ShmantryService : IShmantryService
 
     private async Task<List<ItemEntryWithDetails>> EnrichAsync(List<ItemEntry> entries)
     {
+        var settings = await GetSettingsAsync();
         var result = new List<ItemEntryWithDetails>(entries.Count);
         foreach (var e in entries)
         {
@@ -322,7 +350,8 @@ public class ShmantryService : IShmantryService
                 Quantity = e.Quantity,
                 BestBeforeDate = e.BestBeforeDate,
                 Notes = e.Notes,
-                CreatedAt = e.CreatedAt
+                CreatedAt = e.CreatedAt,
+                ExpiryWarningDays = settings.ExpiryWarningDays
             });
         }
         return result;
@@ -335,7 +364,8 @@ public class ShmantryService : IShmantryService
         var locations = await _db!.Table<StorageLocation>().ToListAsync();
         var foodItems = await _db!.Table<FoodItem>().ToListAsync();
         var entries = await _db!.Table<ItemEntry>().ToListAsync();
-        var data = new { Homes = homes, Locations = locations, FoodItems = foodItems, Entries = entries };
+        var settings = await GetSettingsAsync();
+        var data = new { Homes = homes, Locations = locations, FoodItems = foodItems, Entries = entries, Settings = settings };
         return System.Text.Json.JsonSerializer.Serialize(data, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
     }
 

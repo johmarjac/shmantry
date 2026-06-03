@@ -32,4 +32,8 @@ public interface IShmantryService : IDisposable
 
     Task<string> ExportDataAsync();
     Task<bool> ImportDataAsync(string json);
+
+    Task<AppSettings> GetSettingsAsync();
+    Task SaveSettingsAsync(AppSettings settings);
+    Task<bool> TryAutoLoadAsync();
 }

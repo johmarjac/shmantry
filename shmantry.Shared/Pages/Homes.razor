@@ -47,12 +47,11 @@
                 }
                 else
                 {
-                    <div style="flex-shrink:0;">
-                        <MudChart T="double" ChartType="@ChartType.Donut"
-                                  InputData="@_chartData"
-                                  InputLabels="@_chartLabels"
-                                  Width="140px" Height="140px"
-                                  ChartOptions="@_chartOptions" />
+                    <div style="width:140px;height:140px;border-radius:50%;
+                                background:conic-gradient(@BuildDonutGradient());
+                                position:relative;flex-shrink:0;">
+                        <div style="position:absolute;top:28px;left:28px;right:28px;bottom:28px;
+                                    border-radius:50%;background:#1c1c1e;"></div>
                     </div>
                 }
                 <div class="d-flex flex-column gap-2" style="flex:1;min-width:150px;">
@@ -206,13 +205,6 @@
     private readonly HashSet<string> _expandedHomes = [];
 
     private int _totalQty, _freshQty, _soonQty, _expiredQty, _noDateQty;
-    private double[] _chartData = [];
-    private string[] _chartLabels = [];
-    private readonly ChartOptions _chartOptions = new()
-    {
-        ChartPalette = ["#4caf50", "#ff9800", "#f44336", "#6e6e73"],
-        ShowLegend = false
-    };
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -236,10 +228,30 @@
         _freshQty   = _allEntries.Where(e => e.BestBeforeDate.HasValue && !e.IsExpiringSoon).Sum(e => e.Quantity);
         _noDateQty  = _allEntries.Where(e => !e.BestBeforeDate.HasValue).Sum(e => e.Quantity);
 
-        _chartData   = [(double)_freshQty, (double)_soonQty, (double)_expiredQty, (double)_noDateQty];
-        _chartLabels = ["Haltbar", "Läuft bald ab", "Abgelaufen", "Kein MHD"];
-
         _loading = false;
+    }
+
+    private string BuildDonutGradient()
+    {
+        double total = _totalQty;
+        double current = 0;
+        var parts = new List<string>();
+
+        void Add(double qty, string color)
+        {
+            if (qty <= 0) return;
+            double start = current / total * 360;
+            current += qty;
+            double end = current / total * 360;
+            parts.Add($"{color} {start:F1}deg {end:F1}deg");
+        }
+
+        Add(_freshQty, "#4caf50");
+        Add(_soonQty, "#ff9800");
+        Add(_expiredQty, "#f44336");
+        Add(_noDateQty, "#6e6e73");
+
+        return string.Join(", ", parts);
     }
 
     private LocationStats GetLocationStats(string locationId)

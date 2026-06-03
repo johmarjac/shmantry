@@ -17,7 +17,7 @@
 @code {
     private MudTheme? _theme;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _theme = new MudTheme();
         // ── Backgrounds ──────────────────────────────────────────
@@ -40,6 +40,8 @@
         _theme.PaletteDark.LinesDefault = MudColor.Parse("2a2a2a");
         _theme.PaletteDark.LinesInputs  = MudColor.Parse("3a3a3a");
         _theme.PaletteDark.Divider      = MudColor.Parse("2a2a2a");
+
+        await ShmantryService.TryAutoLoadAsync();
 
         if (ShmantryService.IsAppInitialized())
             Navigation.NavigateTo("home");
