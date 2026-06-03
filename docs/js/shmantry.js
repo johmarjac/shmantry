@@ -255,7 +255,12 @@ window.shmantry = {
             return r.accessToken;
         },
 
+        _SIGNED_IN_FLAG: 'shmantry_od_signed_in',
+
         isSignedIn: async function () {
+            // Respect explicit sign-out: if flag is absent we never show as signed in,
+            // even if MSAL can silently re-detect the Microsoft session.
+            if (!localStorage.getItem(this._SIGNED_IN_FLAG)) return false;
             try { return (await this._getApp()).getAllAccounts().length > 0; } catch { return false; }
         },
 
@@ -277,6 +282,7 @@ window.shmantry = {
             const app = await this._getApp();
             shmantry.oneDrive._clearInteractionLock();
             await app.loginPopup({ scopes: this._SCOPES });
+            localStorage.setItem(this._SIGNED_IN_FLAG, '1');
         },
 
         loadFile: async function () {
@@ -299,8 +305,7 @@ window.shmantry = {
 
         signOut: function () {
             this._app = null;
-            // MSAL v2 uses "msal." prefix; v3 may also key by clientId.
-            // Clear everything matching either pattern so no version leaves state behind.
+            localStorage.removeItem(this._SIGNED_IN_FLAG);
             const cid = this._CLIENT_ID.toLowerCase();
             for (const storage of [sessionStorage, localStorage]) {
                 for (const k of [...Object.keys(storage)]) {
