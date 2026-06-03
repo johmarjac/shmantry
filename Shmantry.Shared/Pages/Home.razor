@@ -1,16 +1,40 @@
 @page "/"
+@inject NavigationManager Navigation
 
 <PageTitle>Shmantry</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight:700;">Dashboard</MudText>
 
-<MudPaper Class="pa-4 mb-3" Elevation="0" Style="border-radius:16px;">
-    <MudText Typo="Typo.subtitle1" Class="mb-1">Willkommen</MudText>
-    <MudText Typo="Typo.body2" Color="Color.Secondary">
-        Das Projekt ist bereit. Seiten und Komponenten kommen aus
-        <code>Shmantry.Shared</code> und laufen auf Web und MAUI.
-    </MudText>
-</MudPaper>
+<AuthorizeView>
+    <Authorized>
+        <MudPaper Class="pa-4 mb-3" Elevation="0" Style="border-radius:16px;">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.subtitle1">@context.User.Identity?.Name</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">OneDrive verbunden</MudText>
+                </MudStack>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                           OnClick="@(() => Navigation.NavigateTo("/authentication/logout"))">
+                    Abmelden
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </Authorized>
+    <NotAuthorized>
+        <MudPaper Class="pa-4 mb-3" Elevation="0" Style="border-radius:16px;">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.subtitle1">OneDrive</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Nicht verbunden</MudText>
+                </MudStack>
+                <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary"
+                           OnClick="@(() => Navigation.NavigateTo("/authentication/login"))">
+                    Anmelden
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </NotAuthorized>
+</AuthorizeView>
 
 <MudGrid>
     <MudItem xs="6">
