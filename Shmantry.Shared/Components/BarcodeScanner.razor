@@ -18,6 +18,29 @@
         </div>
     }
 
+    @if (_ready)
+    {
+        <!-- dark vignette around scan area -->
+        <div style="position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;">
+            <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
+            <div style="display:flex;height:160px;">
+                <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
+                <!-- scan frame -->
+                <div style="width:260px;position:relative;box-sizing:border-box;border:2px solid rgba(255,255,255,0.6);">
+                    <!-- corners -->
+                    <div style="position:absolute;top:-2px;left:-2px;width:20px;height:20px;border-top:3px solid #fff;border-left:3px solid #fff;"></div>
+                    <div style="position:absolute;top:-2px;right:-2px;width:20px;height:20px;border-top:3px solid #fff;border-right:3px solid #fff;"></div>
+                    <div style="position:absolute;bottom:-2px;left:-2px;width:20px;height:20px;border-bottom:3px solid #fff;border-left:3px solid #fff;"></div>
+                    <div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-bottom:3px solid #fff;border-right:3px solid #fff;"></div>
+                    <!-- red scan line -->
+                    <div style="position:absolute;top:50%;left:0;right:0;height:2px;background:#e53935;box-shadow:0 0 6px 1px #e53935cc;transform:translateY(-50%);"></div>
+                </div>
+                <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
+            </div>
+            <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
+        </div>
+    }
+
 </div>
 
 @code {
