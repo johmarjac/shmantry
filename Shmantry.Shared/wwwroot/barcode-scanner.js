@@ -1,5 +1,23 @@
 let _dotNet = null;
 
+function applyStyles(containerEl) {
+    const video = containerEl.querySelector('video');
+    if (video) {
+        video.style.width = '100%';
+        video.style.height = 'auto';
+        video.style.display = 'block';
+        video.style.objectFit = 'contain';
+    }
+    const canvas = containerEl.querySelector('canvas.drawingBuffer');
+    if (canvas) {
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+    }
+}
+
 export async function initScanner(containerEl, dotNetHelper) {
     _dotNet = dotNetHelper;
 
@@ -9,9 +27,7 @@ export async function initScanner(containerEl, dotNetHelper) {
                 type: 'LiveStream',
                 target: containerEl,
                 constraints: {
-                    facingMode: { ideal: 'environment' },
-                    width:  { ideal: 1280 },
-                    height: { ideal: 720 }
+                    facingMode: { ideal: 'environment' }
                 }
             },
             locator: {
@@ -29,6 +45,7 @@ export async function initScanner(containerEl, dotNetHelper) {
             resolve();
         });
     }).then(() => {
+        applyStyles(containerEl);
         Quagga.start();
         dotNetHelper.invokeMethodAsync('OnScannerReady');
     }).catch(err => {
