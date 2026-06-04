@@ -1,25 +1,32 @@
 let _dotNet = null;
 let _observer = null;
 
-function applyStyles(containerEl) {
+function injectHideCanvasStyle() {
+    if (document.getElementById('quagga-style-fix')) return;
+    const style = document.createElement('style');
+    style.id = 'quagga-style-fix';
+    style.textContent = 'canvas.drawingBuffer { display: none !important; }';
+    document.head.appendChild(style);
+}
+
+function applyVideoStyles(containerEl) {
     const video = containerEl.querySelector('video');
     if (video) {
-        video.style.width = '100%';
-        video.style.height = 'auto';
-        video.style.display = 'block';
-        video.style.objectFit = 'cover';
-    }
-    const canvas = containerEl.querySelector('canvas.drawingBuffer');
-    if (canvas) {
-        canvas.style.display = 'none';
+        video.style.setProperty('width', '100%', 'important');
+        video.style.setProperty('height', 'auto', 'important');
+        video.style.setProperty('display', 'block', 'important');
+        video.style.setProperty('object-fit', 'cover', 'important');
+        video.style.setProperty('max-height', '70vh', 'important');
     }
 }
 
 export async function initScanner(containerEl, dotNetHelper) {
     _dotNet = dotNetHelper;
 
-    _observer = new MutationObserver(() => applyStyles(containerEl));
-    _observer.observe(containerEl, { childList: true, subtree: true });
+    injectHideCanvasStyle();
+
+    _observer = new MutationObserver(() => applyVideoStyles(containerEl));
+    _observer.observe(containerEl, { childList: true, subtree: true, attributes: true });
 
     await new Promise((resolve, reject) => {
         Quagga.init({
@@ -46,7 +53,7 @@ export async function initScanner(containerEl, dotNetHelper) {
         });
     }).then(() => {
         Quagga.start();
-        applyStyles(containerEl);
+        applyVideoStyles(containerEl);
         dotNetHelper.invokeMethodAsync('OnScannerReady');
     }).catch(err => {
         dotNetHelper.invokeMethodAsync('OnScannerError', err.toString());
