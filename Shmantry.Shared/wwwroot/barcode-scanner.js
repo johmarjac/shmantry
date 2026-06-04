@@ -20,7 +20,49 @@ function applyVideoStyles(containerEl) {
     }
 }
 
-export async function initScanner(containerEl, dotNetHelper) {
+async function startQuagga(containerEl, dotNetHelper, deviceId) {
+    const constraints = deviceId
+        ? { deviceId: { exact: deviceId } }
+        : { facingMode: { ideal: 'environment' } };
+
+    await new Promise((resolve, reject) => {
+        Quagga.init({
+            inputStream: {
+                type: 'LiveStream',
+                target: containerEl,
+                constraints
+            },
+            locator: { patchSize: 'medium', halfSample: true },
+            numOfWorkers: 4,
+            frequency: 10,
+            decoder: { readers: ['ean_reader', 'ean_8_reader'] },
+            locate: true
+        }, err => {
+            if (err) { reject(err); return; }
+            resolve();
+        });
+    });
+
+    Quagga.start();
+    applyVideoStyles(containerEl);
+
+    Quagga.onDetected(result => {
+        const code = result?.codeResult?.code;
+        if (code) dotNetHelper.invokeMethodAsync('OnBarcodeDetected', code);
+    });
+}
+
+export async function getCameras() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices
+        .filter(d => d.kind === 'videoinput')
+        .map((d, i) => ({
+            deviceId: d.deviceId,
+            label: d.label || `Kamera ${i + 1}`
+        }));
+}
+
+export async function initScanner(containerEl, dotNetHelper, deviceId) {
     _dotNet = dotNetHelper;
 
     injectHideCanvasStyle();
@@ -28,41 +70,15 @@ export async function initScanner(containerEl, dotNetHelper) {
     _observer = new MutationObserver(() => applyVideoStyles(containerEl));
     _observer.observe(containerEl, { childList: true, subtree: true, attributes: true });
 
-    await new Promise((resolve, reject) => {
-        Quagga.init({
-            inputStream: {
-                type: 'LiveStream',
-                target: containerEl,
-                constraints: {
-                    facingMode: { ideal: 'environment' }
-                }
-            },
-            locator: {
-                patchSize: 'medium',
-                halfSample: true
-            },
-            numOfWorkers: 4,
-            frequency: 10,
-            decoder: {
-                readers: ['ean_reader', 'ean_8_reader']
-            },
-            locate: true
-        }, err => {
-            if (err) { reject(err); return; }
-            resolve();
-        });
-    }).then(() => {
-        Quagga.start();
-        applyVideoStyles(containerEl);
-        dotNetHelper.invokeMethodAsync('OnScannerReady');
-    }).catch(err => {
-        dotNetHelper.invokeMethodAsync('OnScannerError', err.toString());
-    });
+    await startQuagga(containerEl, dotNetHelper, deviceId || null)
+        .then(() => dotNetHelper.invokeMethodAsync('OnScannerReady'))
+        .catch(err => dotNetHelper.invokeMethodAsync('OnScannerError', err.toString()));
+}
 
-    Quagga.onDetected(result => {
-        const code = result?.codeResult?.code;
-        if (code) dotNetHelper.invokeMethodAsync('OnBarcodeDetected', code);
-    });
+export async function switchCamera(containerEl, dotNetHelper, deviceId) {
+    try { Quagga.stop(); } catch {}
+    await startQuagga(containerEl, dotNetHelper, deviceId)
+        .catch(err => dotNetHelper.invokeMethodAsync('OnScannerError', err.toString()));
 }
 
 export function stopScanner() {

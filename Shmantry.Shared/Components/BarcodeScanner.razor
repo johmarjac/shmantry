@@ -1,44 +1,57 @@
 @inject IJSRuntime JS
 @implements IAsyncDisposable
+@using System.Text.Json.Serialization
 
-<div @ref="_container" style="position:relative;border-radius:12px;overflow:hidden;background:#000;width:100%;">
+<div style="display:flex;flex-direction:column;gap:8px;">
 
-    @if (!_ready && _error == null)
-    {
-        <div style="padding:48px;display:flex;flex-direction:column;align-items:center;gap:12px;">
-            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Kamera wird gestartet…</MudText>
-        </div>
-    }
+    <div @ref="_container" style="position:relative;border-radius:12px;overflow:hidden;background:#000;width:100%;">
 
-    @if (_error != null)
-    {
-        <div style="padding:16px;">
-            <MudAlert Severity="Severity.Error">@_error</MudAlert>
-        </div>
-    }
+        @if (!_ready && _error == null)
+        {
+            <div style="padding:48px;display:flex;flex-direction:column;align-items:center;gap:12px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Kamera wird gestartet…</MudText>
+            </div>
+        }
 
-    @if (_ready)
-    {
-        <!-- dark vignette around scan area -->
-        <div style="position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;">
-            <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
-            <div style="display:flex;height:160px;">
+        @if (_error != null)
+        {
+            <div style="padding:16px;">
+                <MudAlert Severity="Severity.Error">@_error</MudAlert>
+            </div>
+        }
+
+        @if (_ready)
+        {
+            <div style="position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;">
                 <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
-                <!-- scan frame -->
-                <div style="width:260px;position:relative;box-sizing:border-box;border:2px solid rgba(255,255,255,0.6);">
-                    <!-- corners -->
-                    <div style="position:absolute;top:-2px;left:-2px;width:20px;height:20px;border-top:3px solid #fff;border-left:3px solid #fff;"></div>
-                    <div style="position:absolute;top:-2px;right:-2px;width:20px;height:20px;border-top:3px solid #fff;border-right:3px solid #fff;"></div>
-                    <div style="position:absolute;bottom:-2px;left:-2px;width:20px;height:20px;border-bottom:3px solid #fff;border-left:3px solid #fff;"></div>
-                    <div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-bottom:3px solid #fff;border-right:3px solid #fff;"></div>
-                    <!-- red scan line -->
-                    <div style="position:absolute;top:50%;left:0;right:0;height:2px;background:#e53935;box-shadow:0 0 6px 1px #e53935cc;transform:translateY(-50%);"></div>
+                <div style="display:flex;height:160px;">
+                    <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
+                    <div style="width:260px;position:relative;box-sizing:border-box;border:2px solid rgba(255,255,255,0.6);">
+                        <div style="position:absolute;top:-2px;left:-2px;width:20px;height:20px;border-top:3px solid #fff;border-left:3px solid #fff;"></div>
+                        <div style="position:absolute;top:-2px;right:-2px;width:20px;height:20px;border-top:3px solid #fff;border-right:3px solid #fff;"></div>
+                        <div style="position:absolute;bottom:-2px;left:-2px;width:20px;height:20px;border-bottom:3px solid #fff;border-left:3px solid #fff;"></div>
+                        <div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-bottom:3px solid #fff;border-right:3px solid #fff;"></div>
+                        <div style="position:absolute;top:50%;left:0;right:0;height:2px;background:#e53935;box-shadow:0 0 6px 1px #e53935cc;transform:translateY(-50%);"></div>
+                    </div>
+                    <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
                 </div>
                 <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
             </div>
-            <div style="flex:1;background:rgba(0,0,0,0.45);"></div>
-        </div>
+        }
+
+    </div>
+
+    @if (_cameras.Count > 1)
+    {
+        <MudSelect T="string" Value="_selectedDeviceId" ValueChanged="SwitchCameraAsync"
+                   Label="Kamera" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                   AdornmentIcon="@Icons.Material.Filled.Videocam" Adornment="Adornment.Start">
+            @foreach (var cam in _cameras)
+            {
+                <MudSelectItem Value="@cam.DeviceId">@cam.Label</MudSelectItem>
+            }
+        </MudSelect>
     }
 
 </div>
@@ -51,6 +64,8 @@
     private DotNetObjectReference<BarcodeScanner>? _self;
     private bool _ready;
     private string? _error;
+    private List<CameraInfo> _cameras = [];
+    private string? _selectedDeviceId;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -58,14 +73,17 @@
         _module = await JS.InvokeAsync<IJSObjectReference>(
             "import", "./_content/Shmantry.Shared/barcode-scanner.js");
         _self = DotNetObjectReference.Create(this);
-        await _module.InvokeVoidAsync("initScanner", _container, _self);
+        await _module.InvokeVoidAsync("initScanner", _container, _self, null);
     }
 
     [JSInvokable]
-    public Task OnScannerReady()
+    public async Task OnScannerReady()
     {
         _ready = true;
-        return InvokeAsync(StateHasChanged);
+        _cameras = await _module!.InvokeAsync<List<CameraInfo>>("getCameras");
+        if (_selectedDeviceId == null && _cameras.Count > 0)
+            _selectedDeviceId = _cameras[0].DeviceId;
+        await InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable]
@@ -79,6 +97,12 @@
     public Task OnBarcodeDetected(string code) =>
         InvokeAsync(() => OnDetected.InvokeAsync(code));
 
+    private async Task SwitchCameraAsync(string deviceId)
+    {
+        _selectedDeviceId = deviceId;
+        await _module!.InvokeVoidAsync("switchCamera", _container, _self, deviceId);
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_module is not null)
@@ -88,4 +112,9 @@
         }
         _self?.Dispose();
     }
+
+    private record CameraInfo(
+        [property: JsonPropertyName("deviceId")] string DeviceId,
+        [property: JsonPropertyName("label")] string Label
+    );
 }
