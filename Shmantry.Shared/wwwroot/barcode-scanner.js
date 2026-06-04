@@ -20,6 +20,16 @@ function applyVideoStyles(containerEl) {
     }
 }
 
+async function enableAutofocus(containerEl) {
+    const video = containerEl.querySelector('video');
+    const track = video?.srcObject?.getVideoTracks?.()?.[0];
+    if (!track) return;
+    const caps = track.getCapabilities?.() ?? {};
+    if (caps.focusMode?.includes('continuous')) {
+        try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch {}
+    }
+}
+
 async function startQuagga(containerEl, dotNetHelper, deviceId) {
     const constraints = deviceId
         ? { deviceId: { exact: deviceId } }
@@ -45,6 +55,7 @@ async function startQuagga(containerEl, dotNetHelper, deviceId) {
 
     Quagga.start();
     applyVideoStyles(containerEl);
+    enableAutofocus(containerEl);
 
     Quagga.onDetected(result => {
         const code = result?.codeResult?.code;
